@@ -54,6 +54,15 @@ has no native bitemporal support and hand-rolling six-predicate temporal joins
 would be a large amount of machinery for three questions. What these need is a
 sequence comparison, and that is what they get.
 
+## `recorded_seq` is an ordering, not a count
+
+The live store has gaps in it — SQLite's `AUTOINCREMENT` burns a value on any
+statement that fails inside a transaction, so density is luck. Nothing here
+assumes it: `as_of` compares `<=` and a point *inside* a gap is a legitimate
+query. What would break belief reconstruction is reuse or non-monotonicity, and
+`belief_reconstruction_tolerates_gaps_in_the_sequence` asserts both, having
+first checked the fixture actually leaves a gap.
+
 ## The honest gap
 
 Records written before migration 0003 carry **no `recorded_at` timestamp** —

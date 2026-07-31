@@ -253,3 +253,54 @@ fn a_retirement_cannot_predate_the_record_it_retires() {
         "the trigger must reject an impossible ordering"
     );
 }
+
+#[test]
+fn belief_reconstruction_tolerates_gaps_in_the_sequence() {
+    // The live store has gaps: SQLite's AUTOINCREMENT burns a value on any
+    // statement that fails inside a transaction, so recorded_seq is dense only
+    // by luck. as_of compares <= against it and must never assume density.
+    //
+    // What WOULD break belief reconstruction is reuse or non-monotonicity.
+    // Those are the properties asserted here; the gap is not a defect.
+    let s = Store::open_in_memory().unwrap();
+    let a = write(&s, "first", "2026-07-01T00:00:00Z", "2026-07-01T00:00:00Z");
+
+    // Burn some sequence values the way a failed statement would.
+    // sqlite_sequence has no UNIQUE on `name`, so ON CONFLICT does not apply.
+    s.conn
+        .execute(
+            "UPDATE sqlite_sequence SET seq = 50 WHERE name = 'memories'",
+            [],
+        )
+        .unwrap();
+    let b = write(&s, "second", "2026-07-02T00:00:00Z", "2026-07-02T00:00:00Z");
+
+    let seqs: Vec<i64> = {
+        let mut st = s
+            .conn
+            .prepare("SELECT recorded_seq FROM memories ORDER BY recorded_seq")
+            .unwrap();
+        st.query_map([], |r| r.get(0))
+            .unwrap()
+            .map(|x| x.unwrap())
+            .collect()
+    };
+    assert!(
+        seqs[1] - seqs[0] > 1,
+        "the fixture must actually leave a gap"
+    );
+    assert!(seqs.windows(2).all(|w| w[1] > w[0]), "monotonic");
+
+    // Reconstruction still works across the gap in both directions.
+    let SeqAt::Resolved { seq } = s.seq_at("2026-07-01T12:00:00Z").unwrap() else {
+        panic!()
+    };
+    assert_eq!(s.belief_at(&a, seq).unwrap(), Some(BeliefAt::Current));
+    assert_eq!(s.belief_at(&b, seq).unwrap(), Some(BeliefAt::NotYetKnown));
+
+    // A point INSIDE the gap is a legitimate query and must behave sanely.
+    let mid = (seqs[0] + seqs[1]) / 2;
+    assert_eq!(s.belief_at(&a, mid).unwrap(), Some(BeliefAt::Current));
+    assert_eq!(s.belief_at(&b, mid).unwrap(), Some(BeliefAt::NotYetKnown));
+    assert_eq!(s.current_as_of(mid, 10).unwrap().len(), 1);
+}
