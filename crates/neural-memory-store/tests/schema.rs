@@ -51,12 +51,14 @@ fn insert_observation(
 #[test]
 fn migrations_apply_and_are_idempotent() {
     let s = Store::open_in_memory().unwrap();
-    assert_eq!(migrate::current_version(&s.conn).unwrap(), 1);
+    let latest = migrate::latest_version();
+    assert!(latest >= 2, "0002_embeddings must be registered");
+    assert_eq!(migrate::current_version(&s.conn).unwrap(), latest);
 
     // Re-running must not error and must not bump the version.
     let mut conn = s.conn;
     migrate::apply_all(&mut conn).unwrap();
-    assert_eq!(migrate::current_version(&conn).unwrap(), 1);
+    assert_eq!(migrate::current_version(&conn).unwrap(), latest);
 }
 
 #[test]

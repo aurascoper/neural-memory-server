@@ -42,8 +42,21 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Store, StoreError};
 
-pub const W_LEXICAL: f64 = 0.70;
-pub const W_GRAPH: f64 = 0.25;
+// M1 (no semantic term): lexical 0.70, graph 0.25, recency 0.05.
+//
+// Re-derived again for M2 rather than renormalised -- the same discipline
+// applied when the semantic term was absent. Semantic earns a real share
+// because finding a paraphrase the wording missed is the entire reason to add
+// it. It does NOT take the largest share, because this store is full of exact
+// tokens that carry the meaning: model names, metric names, thread counts,
+// digests. "Qwen3 8B at 24 threads" is a lexical question, and an embedding
+// that decides 8 and 24 are interchangeable numbers is worse than useless on it.
+//
+// Recency stays a tiebreaker at 0.05 for the M1 reason, unchanged: measurements
+// do not decay, and retirement is explicit rather than implied by age.
+pub const W_LEXICAL: f64 = 0.45;
+pub const W_SEMANTIC: f64 = 0.30;
+pub const W_GRAPH: f64 = 0.20;
 pub const W_RECENCY: f64 = 0.05;
 
 /// Long on purpose. A measurement from six months ago is still a measurement;
@@ -54,6 +67,7 @@ pub const RECENCY_HALF_LIFE_DAYS: f64 = 180.0;
 #[serde(rename_all = "camelCase")]
 pub enum Branch {
     Lexical,
+    Semantic,
     Provenance,
 }
 
@@ -77,6 +91,9 @@ pub struct Hit {
     /// direct textual match from something reached only by traversal.
     pub branches: Vec<Branch>,
     pub lexical_score: Option<f64>,
+    /// Cosine similarity in the query's embedding space. `None` when this
+    /// record carries no vector there, which is different from scoring zero.
+    pub semantic_score: Option<f64>,
     pub graph_distance: Option<u32>,
     pub recency_score: f64,
     /// True when this record has been retired. Present only when the caller
@@ -99,6 +116,7 @@ pub struct Hit {
 #[serde(rename_all = "camelCase")]
 pub struct BranchCounts {
     pub lexical: usize,
+    pub semantic: usize,
     pub provenance: usize,
     pub unique: usize,
 }
@@ -121,8 +139,20 @@ pub struct RecallResult {
     pub conflicting_pairs: Vec<(String, String)>,
 }
 
+/// A query vector and the space it lives in. Both are required together: a
+/// vector without its space identity cannot be compared to anything safely.
+pub struct SemanticQuery<'a> {
+    pub profile_identity: &'a str,
+    pub vector: &'a [f32],
+}
+
 pub struct RecallOptions<'a> {
     pub query: &'a str,
+    /// `None` disables the semantic branch entirely, which is the correct
+    /// behaviour when no embedder is reachable: lexical and provenance still
+    /// work, and the caller is told the branch was absent rather than being
+    /// given silently worse results.
+    pub semantic: Option<SemanticQuery<'a>>,
     /// Reference instant for recency. Required — the store never reads a clock.
     pub as_of: &'a str,
     pub limit: usize,
@@ -137,6 +167,7 @@ impl Default for RecallOptions<'_> {
     fn default() -> Self {
         Self {
             query: "",
+            semantic: None,
             as_of: "2026-01-01T00:00:00Z",
             limit: 20,
             max_hops: 1,
@@ -174,6 +205,7 @@ struct Candidate {
     claim: String,
     evidence_class: String,
     lexical_raw: Option<f64>,
+    semantic_raw: Option<f64>,
     graph_distance: Option<u32>,
     age_days: Option<f64>,
     superseded_at: Option<String>,
@@ -232,6 +264,7 @@ impl Store {
                         // bm25 is negative and more-negative is better; flip it
                         // so larger means more relevant, then normalise below.
                         lexical_raw: Some(-rank),
+                        semantic_raw: None,
                         graph_distance: None,
                         age_days: age,
                         superseded_at: sup_at,
@@ -242,7 +275,48 @@ impl Store {
             }
         }
 
-        // ---- branch 2: provenance expansion from the lexical seeds --------
+        // ---- branch 2: semantic --------------------------------------------
+        // Runs before provenance so its hits also seed graph expansion: a
+        // record found only by meaning is as good a starting point as one found
+        // by wording, and treating it as second-class would waste the branch.
+        if let Some(sem) = &opt.semantic {
+            let found = self
+                .vector_search(
+                    sem.profile_identity,
+                    sem.vector,
+                    opt.limit * 4,
+                    opt.include_retired,
+                )
+                .map_err(|e| StoreError::Migration(e.to_string()))?;
+            for h in found {
+                let sim = f64::from(h.similarity);
+                if let Some(existing) = cands.get_mut(&h.record_digest) {
+                    if !existing.branches.contains(&Branch::Semantic) {
+                        existing.branches.push(Branch::Semantic);
+                    }
+                    existing.semantic_raw = Some(sim);
+                    continue;
+                }
+                let Some(c) = self.load_candidate(&h.record_digest, opt.as_of)? else {
+                    continue;
+                };
+                if c.superseded_at.is_some() && !opt.include_retired {
+                    withheld.push(h.record_digest);
+                    continue;
+                }
+                lexical_seeds.push(h.record_digest.clone());
+                cands.insert(
+                    h.record_digest,
+                    Candidate {
+                        semantic_raw: Some(sim),
+                        branches: vec![Branch::Semantic],
+                        ..c
+                    },
+                );
+            }
+        }
+
+        // ---- branch 3: provenance expansion from the seeds ------------------
         if opt.max_hops > 0 {
             for seed in &lexical_seeds {
                 for (digest, depth) in self.traverse(seed, Direction::Both, opt.max_hops)? {
@@ -303,7 +377,14 @@ impl Store {
                     .map(|d| 1.0 / (d.max(1) as f64))
                     .unwrap_or(0.0);
                 let rec = recency_score(c.age_days);
-                let score = W_LEXICAL * lex.unwrap_or(0.0) + W_GRAPH * graph + W_RECENCY * rec;
+                // Cosine runs [-1, 1]; a negative similarity is evidence of
+                // unrelatedness, not of relevance, so it is floored rather than
+                // allowed to drag a record below one carrying no vector at all.
+                let sem = c.semantic_raw.map(|v| v.clamp(0.0, 1.0));
+                let score = W_LEXICAL * lex.unwrap_or(0.0)
+                    + W_SEMANTIC * sem.unwrap_or(0.0)
+                    + W_GRAPH * graph
+                    + W_RECENCY * rec;
                 Hit {
                     record_digest: digest,
                     claim: c.claim,
@@ -311,6 +392,7 @@ impl Store {
                     score,
                     branches: c.branches,
                     lexical_score: lex,
+                    semantic_score: sem,
                     graph_distance: c.graph_distance,
                     recency_score: rec,
                     superseded: c.superseded_at.is_some(),
@@ -386,6 +468,10 @@ impl Store {
                 .iter()
                 .filter(|h| h.branches.contains(&Branch::Lexical))
                 .count(),
+            semantic: hits
+                .iter()
+                .filter(|h| h.branches.contains(&Branch::Semantic))
+                .count(),
             provenance: hits
                 .iter()
                 .filter(|h| h.branches.contains(&Branch::Provenance))
@@ -419,6 +505,7 @@ impl Store {
                 claim: r.get(0)?,
                 evidence_class: r.get(1)?,
                 lexical_raw: None,
+                semantic_raw: None,
                 graph_distance: None,
                 age_days: r.get(2)?,
                 superseded_at: r.get(3)?,

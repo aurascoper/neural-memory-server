@@ -8,8 +8,20 @@ use rusqlite::Connection;
 use crate::StoreError;
 
 /// `(version, name, sql)`, applied in ascending order.
-const MIGRATIONS: &[(i64, &str, &str)] =
-    &[(1, "init", include_str!("../migrations/0001_init.sql"))];
+const MIGRATIONS: &[(i64, &str, &str)] = &[
+    (1, "init", include_str!("../migrations/0001_init.sql")),
+    (
+        2,
+        "embeddings",
+        include_str!("../migrations/0002_embeddings.sql"),
+    ),
+];
+
+/// Highest migration this build knows about. Exposed so tests track the list
+/// rather than a magic number that goes stale the moment a migration is added.
+pub fn latest_version() -> i64 {
+    MIGRATIONS.iter().map(|(v, _, _)| *v).max().unwrap_or(0)
+}
 
 pub fn apply_all(conn: &mut Connection) -> Result<(), StoreError> {
     conn.execute_batch(

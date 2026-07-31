@@ -406,3 +406,107 @@ pub fn memory_record_identity(m: &MemoryRecordTerms) -> String {
         harness_run_id: m.harness_run_id.as_deref(),
     })
 }
+
+// ---------------------------------------------------------------------------
+// Embedding space
+// ---------------------------------------------------------------------------
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Pooling {
+    Mean,
+    Cls,
+    LastToken,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum Normalization {
+    None,
+    L2,
+}
+
+/// What makes two vectors comparable.
+///
+/// Field set mirrors `neuralcompose-mobile-core`'s `embedding_space_identity`
+/// (`model_pack.rs:305`), deliberately including pooling, normalization and the
+/// task instruction — change any of them and the vectors mean something else,
+/// however similar the text.
+///
+/// **The backend is absent, and that is the point.** A CPU run and an NPU run of
+/// the same model produce vectors in the same space or they do not, and that is
+/// a question to be *measured*, not asserted by stamping a different identity on
+/// them. Putting the backend here would fork the space by declaration and make
+/// the measurement unaskable. Where the vector came from belongs on the runtime
+/// variant; whether the two may share an index is what conformance decides.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EmbeddingProfileTerms {
+    pub model_family: String,
+    pub model_revision: String,
+    /// Weight artifact digests. **SORTED** — shard listing order is noise.
+    pub weight_sha256: Vec<String>,
+    /// Tokenizer artifact digests. **SORTED.**
+    pub tokenizer_sha256: Vec<String>,
+    pub dimensions: u32,
+    pub pooling: Pooling,
+    pub normalization: Normalization,
+    /// e.g. nomic's `search_document:` / `search_query:` prefixes. A different
+    /// instruction is a different space, not a different query.
+    pub task_instruction: Option<String>,
+}
+
+const EMBEDDING_SPACE_DOMAIN: &str = "neuralmemory.embedding-space.v1";
+
+pub fn embedding_space_identity(p: &EmbeddingProfileTerms) -> String {
+    #[derive(Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Doc<'a> {
+        domain: &'static str,
+        model_family: &'a str,
+        model_revision: &'a str,
+        weight_sha256: Vec<String>,
+        tokenizer_sha256: Vec<String>,
+        dimensions: u32,
+        pooling: Pooling,
+        normalization: Normalization,
+        task_instruction: Option<&'a str>,
+    }
+    let mut w = p.weight_sha256.clone();
+    w.sort();
+    let mut t = p.tokenizer_sha256.clone();
+    t.sort();
+    seal(&Doc {
+        domain: EMBEDDING_SPACE_DOMAIN,
+        model_family: &p.model_family,
+        model_revision: &p.model_revision,
+        weight_sha256: w,
+        tokenizer_sha256: t,
+        dimensions: p.dimensions,
+        pooling: p.pooling,
+        normalization: p.normalization,
+        task_instruction: p.task_instruction.as_deref(),
+    })
+}
+
+/// One indexed record: *what* was embedded and *by which embedding space*.
+///
+/// Carried over from `property_law.rs:29`. Two records with the same pair are
+/// the same entry; two with different space identities are never the same entry,
+/// however similar the text.
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct IndexEntryKey {
+    pub content_sha256_hex: String,
+    pub embedding_space_identity: String,
+}
+
+/// Do these two entries belong in the same index?
+///
+/// Only when the embedding space is identical — **mixing spaces silently poisons
+/// retrieval**. Silently is the operative word: cosine similarity between
+/// vectors from different spaces returns a plausible number, so nothing fails,
+/// results are merely wrong.
+pub fn shares_index(a: &IndexEntryKey, b: &IndexEntryKey) -> bool {
+    a.embedding_space_identity == b.embedding_space_identity
+}

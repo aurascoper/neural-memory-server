@@ -109,6 +109,7 @@ fn the_retired_fact_is_absent_from_default_recall_and_reported_as_withheld() {
 
     let res = s
         .recall(&RecallOptions {
+            semantic: None,
             query: "backend dimension identical seal blocked",
             as_of: "2026-07-30T12:00:00Z",
             limit: 20,

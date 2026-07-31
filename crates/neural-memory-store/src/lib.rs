@@ -12,6 +12,7 @@ pub mod derive;
 pub mod ingest;
 pub mod migrate;
 pub mod retrieval;
+pub mod vector;
 pub mod write;
 
 pub use derive::{Derivation, DerivationError};
@@ -20,6 +21,7 @@ pub use retrieval::{
     Branch, BranchCounts, ConflictObligation, Direction, EdgeDetail, Hit, ObservationDetail,
     ProvenanceStep, RecallOptions, RecallResult, RecordDetail,
 };
+pub use vector::{VectorError, VectorHit};
 pub use write::{EvidenceRefusal, MemoryWrite, WriteChannel, WriteError, Wrote};
 
 #[derive(Debug)]

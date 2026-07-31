@@ -10,6 +10,7 @@ const NOW: &str = "2026-07-30T12:00:00Z";
 fn session() -> Session {
     Session {
         as_of: NOW.to_string(),
+        embedder: None,
     }
 }
 

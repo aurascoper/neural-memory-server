@@ -9,6 +9,9 @@ neural-memory-domain = { path = "../neural-memory-domain" }
 neural-memory-store = { path = "../neural-memory-store" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+# Sync HTTP, no async runtime. Network I/O lives in the shell crate; the store
+# does SQLite and nothing else.
+ureq = { version = "2", features = ["json"] }
 
 [[bin]]
 name = "neural-memory-mcp"
@@ -29,3 +32,7 @@ path = "src/bin/import-contested.rs"
 [[bin]]
 name = "neural-memory-ingest"
 path = "src/bin/ingest.rs"
+
+[[bin]]
+name = "neural-memory-embed"
+path = "src/bin/embed.rs"

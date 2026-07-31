@@ -33,6 +33,7 @@
 
 pub mod corpus;
 pub mod corpus_contested;
+pub mod embed;
 
 use neural_memory_domain::{EvidenceClass, MemoryRecordTerms};
 use neural_memory_store::{MemoryWrite, RecallOptions, Store, WriteChannel};
@@ -44,6 +45,9 @@ pub const SERVER_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Session-wide configuration supplied by whoever launched the server.
 pub struct Session {
+    ///  disables the semantic branch. Retrieval still works; the result
+    /// says the branch was absent rather than pretending it ran.
+    pub embedder: Option<embed::Embedder>,
     /// Reference instant for recency. Supplied at launch rather than read from
     /// a clock, so retrieval stays reproducible and the store keeps no clock
     /// dependency. A tool call may override it.
@@ -231,8 +235,29 @@ pub fn call_tool(
                 .and_then(Value::as_str)
                 .unwrap_or(&session.as_of)
                 .to_string();
+            // Embed the query if an embedder is configured AND reachable. A
+            // transport failure degrades to lexical + provenance and is
+            // reported, rather than failing the whole call: partial retrieval
+            // beats none, provided the caller is told which it got.
+            let mut sem_vec: Option<Vec<f32>> = None;
+            let mut sem_note: Option<String> = None;
+            if let Some(e) = &session.embedder {
+                match e.embed_query(&query) {
+                    Ok(v) => sem_vec = Some(v),
+                    Err(err) => sem_note = Some(err.to_string()),
+                }
+            } else {
+                sem_note = Some("no embedder configured; semantic branch absent".into());
+            }
+            let sem = sem_vec
+                .as_ref()
+                .map(|v| neural_memory_store::retrieval::SemanticQuery {
+                    profile_identity: &session.embedder.as_ref().unwrap().profile_identity,
+                    vector: v,
+                });
             let opt = RecallOptions {
                 query: &query,
+                semantic: sem,
                 as_of: &as_of,
                 limit: args
                     .get("limit")
@@ -252,7 +277,16 @@ pub fn call_tool(
             let r = store
                 .recall(&opt)
                 .map_err(|e| ToolError::new(e.to_string()))?;
-            Ok(serde_json::to_value(r).expect("serialize"))
+            let mut v = serde_json::to_value(r).expect("serialize");
+            if let (Some(note), Some(o)) = (sem_note, v.as_object_mut()) {
+                o.insert(
+                    "semanticBranch".into(),
+                    json!({"ran": false, "reason": note}),
+                );
+            } else if let Some(o) = v.as_object_mut() {
+                o.insert("semanticBranch".into(), json!({"ran": true}));
+            }
+            Ok(v)
         }
 
         "get_record" => {

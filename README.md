@@ -93,12 +93,48 @@ an artifact that exists; `"derived"` requires a transform that recomputes;
 unknown fields are rejected rather than ignored, because a typo'd key silently
 dropped is evidence quietly not recorded.
 
+## Retrieval
+
+Three branches, merged application-side with per-hit attribution: FTS5 `bm25`
+lexical, cosine over stored vectors, and a cycle-guarded provenance walk. Weights
+are **re-derived** whenever the branch set changes, never renormalised:
+
+| signal | M1 | M2 | why |
+|---|---:|---:|---|
+| lexical | 0.70 | 0.45 | exact tokens carry the meaning here — model names, metrics, thread counts |
+| semantic | — | 0.30 | finds the paraphrase the wording missed, which is the whole reason to add it |
+| graph | 0.25 | 0.20 | a record reachable from a hit is corroborating |
+| recency | 0.05 | 0.05 | tiebreaker only; measurements do not decay and retirement is explicit |
+
+Semantic deliberately does not take the largest share. "Qwen3 8B at 24 threads"
+is a lexical question, and an embedding that treats 8 and 24 as interchangeable
+numbers is worse than useless on it.
+
+Vector search is **brute force with no index**. A 5000 x 768 scan takes 111 ms in
+a debug build; an ANN index would add an extension dependency and approximate
+results to optimise something that is not the bottleneck. `tests/vector.rs`
+measures it, so the day a scan stops being fast enough is a measurement rather
+than a surprise.
+
+**Vectors from different embedding spaces are never compared.** Cosine between
+two spaces returns a plausible number — nothing errors, the results are just
+wrong. The space identity is half the primary key and half of every query's
+`WHERE`, so no code path can mix them. The identity covers model, revision,
+weights, tokenizer, dimensions, pooling, normalization and task instruction, and
+**excludes the backend**: whether a CPU-derived and an NPU-derived vector share a
+space is a question to *measure*, and stamping the backend into the identity
+would fork them by declaration and make the measurement unaskable.
+
+The branch is optional. With no embedder configured or reachable, retrieval
+degrades to lexical + provenance and reports `semanticBranch: {ran: false,
+reason}` rather than returning quietly worse results.
+
 ## Architecture
 
 ```
 neural-memory-domain   PURE. no database, no async runtime, no clock, no uuid.
                        Sealed identities, sort discipline, the assembler.
-neural-memory-store    SQLite + FTS5. migrations, retrieval, ingestion.
+neural-memory-store    SQLite + FTS5 + vectors. migrations, retrieval, ingestion.
 neural-memory-mcp      typed MCP tools + operator CLIs.
 ```
 
@@ -166,8 +202,12 @@ exists, and are void if edited after a grading run.
 
 ## Known limits
 
-- **M2 is unbuilt by design**: no embeddings or vector search, no entity
-  retrieval branch, no temporal queries, no as-of time travel.
+- **The semantic branch is built but not shown to help.** Over the current
+  26-record corpus it surfaced 5 records lexical missed across 5 queries and
+  **changed the top hit on none of them**; on two queries the extra records were
+  plainly off-topic. It is correct and it is not yet earning its keep. See
+  [Retrieval](#retrieval).
+- **Still unbuilt**: entity retrieval branch, temporal queries, as-of time travel.
 - **Concurrency is untested.** One SQLite file, WAL mode, multiple clients.
 - **No backup procedure.** Backup is copying the file; that is not the same as
   having tested a restore.

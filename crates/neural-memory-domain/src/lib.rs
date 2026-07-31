@@ -36,9 +36,10 @@ pub use assembler::{
 };
 pub use digest::{sha256_hex, valid_sha256};
 pub use terms::{
-    artifact_identity, evaluation_suite_identity, measurement_policy_identity,
-    memory_record_identity, observation_identity, reference_execution_identity,
-    validate_observation, ArtifactTerms, EvaluationSuiteTerms, EvidenceClass,
-    MeasurementPolicyTerms, MemoryRecordTerms, ObservationDefect, ObservationTerms, QuantityKind,
-    ReferenceExecutionTerms,
+    artifact_identity, embedding_space_identity, evaluation_suite_identity,
+    measurement_policy_identity, memory_record_identity, observation_identity,
+    reference_execution_identity, shares_index, validate_observation, ArtifactTerms,
+    EmbeddingProfileTerms, EvaluationSuiteTerms, EvidenceClass, IndexEntryKey,
+    MeasurementPolicyTerms, MemoryRecordTerms, Normalization, ObservationDefect, ObservationTerms,
+    Pooling, QuantityKind, ReferenceExecutionTerms,
 };
