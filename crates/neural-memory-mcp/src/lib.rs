@@ -169,6 +169,27 @@ pub fn tool_definitions() -> Value {
             }
         },
         {
+            "name": "as_of",
+            "description": "Reconstruct what the store believed at a past point. \
+                            Returns the claims that were current then, including \
+                            ones since retired and excluding ones not yet written. \
+                            Use this to judge whether a past decision was reasonable \
+                            on the evidence available at the time — asking today's \
+                            store gives today's answer, which is a different question.",
+            "inputSchema": {
+                "type": "object",
+                "properties": {
+                    "instant": {"type": "string", "description":
+                        "RFC-3339. Resolved to a point in transaction order. If the \
+                         records that early carry no recorded timestamp, that is \
+                         reported rather than guessed."},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 200, "default": 50}
+                },
+                "required": ["instant"],
+                "additionalProperties": false
+            }
+        },
+        {
             "name": "flag_contradiction",
             "description": "Record that two claims appear to conflict. This creates a \
                             reviewable 'contradicts' edge and retires NOTHING. Superseding a \
@@ -351,6 +372,7 @@ pub fn call_tool(
                     harness_run_id: None,
                 },
                 occurred_at: args.get("occurredAt").and_then(Value::as_str),
+                recorded_at: args.get("occurredAt").and_then(Value::as_str),
                 derivation: None,
             };
             let (digest, wrote) = store
@@ -449,6 +471,41 @@ pub fn call_tool(
                 "citedCount": cited.len(),
                 "conflictsAcknowledged": acked.len(),
                 "answerChars": answer.len(),
+            }))
+        }
+
+        "as_of" => {
+            let instant = need_str(args, "instant")?;
+            let limit = args
+                .get("limit")
+                .and_then(Value::as_u64)
+                .unwrap_or(50)
+                .clamp(1, 200) as usize;
+            let at = store
+                .seq_at(&instant)
+                .map_err(|e| ToolError::new(e.to_string()))?;
+            let seq = match &at {
+                neural_memory_store::SeqAt::Resolved { seq } => *seq,
+                // Not an error: "the store held nothing then" and "those records
+                // have no timestamp" are both legitimate answers, and raising
+                // them as failures invites a retry that cannot succeed.
+                other => {
+                    return Ok(json!({
+                        "instant": instant,
+                        "resolved": false,
+                        "reason": other,
+                        "believed": [],
+                    }))
+                }
+            };
+            let entries = store
+                .current_as_of(seq, limit)
+                .map_err(|e| ToolError::new(e.to_string()))?;
+            Ok(json!({
+                "instant": instant,
+                "resolved": true,
+                "sequence": seq,
+                "believed": entries,
             }))
         }
 

@@ -109,6 +109,7 @@ pub fn import_contested(store: &Store) -> Result<String, String> {
                 harness_run_id: Some("gpd-thread-sweep-20260730".into()),
             },
             occurred_at: Some(AT),
+            recorded_at: Some(AT),
             derivation: d,
         };
         let (dg, wrote) = store

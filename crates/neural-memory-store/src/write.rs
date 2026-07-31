@@ -106,7 +106,12 @@ impl From<StoreError> for WriteError {
 /// A memory record plus whatever justifies its evidence class.
 pub struct MemoryWrite<'a> {
     pub terms: MemoryRecordTerms,
+    /// Valid time: when the claim was true of the world.
     pub occurred_at: Option<&'a str>,
+    /// Transaction time: when the store came to believe it. Supplied by the
+    /// caller rather than read from a clock, so an import is reproducible and
+    /// the two axes cannot silently collapse into one.
+    pub recorded_at: Option<&'a str>,
     /// Required when claiming `DerivedDeterministically`.
     pub derivation: Option<Derivation>,
 }
@@ -279,8 +284,8 @@ impl Store {
         let n = self.conn.execute(
             "INSERT OR IGNORE INTO memories
                (record_digest, claim, evidence_class, source_artifact_sha256,
-                source_locator, harness_run_id, occurred_at)
-             VALUES (?1,?2,?3,?4,?5,?6,?7)",
+                source_locator, harness_run_id, occurred_at, recorded_at)
+             VALUES (?1,?2,?3,?4,?5,?6,?7,?8)",
             params![
                 digest,
                 terms.claim,
@@ -288,7 +293,8 @@ impl Store {
                 terms.source_artifact_sha256,
                 terms.source_locator,
                 terms.harness_run_id,
-                w.occurred_at
+                w.occurred_at,
+                w.recorded_at
             ],
         )?;
 
@@ -405,10 +411,18 @@ impl Store {
     /// invalidate the prefix *and* erase that the belief changed.
     pub fn supersede(&self, retired: &str, replacement: &str, at: &str) -> Result<(), WriteError> {
         let tx_conn = &self.conn;
+        // The supersession happens NOW in transaction order. The current high
+        // watermark is that point: the replacement already exists, so the store
+        // could not have known this any earlier.
+        let now_seq: i64 = tx_conn.query_row(
+            "SELECT coalesce(max(recorded_seq), 0) FROM memories",
+            [],
+            |r| r.get(0),
+        )?;
         tx_conn.execute(
-            "UPDATE memories SET superseded_by = ?2, superseded_at = ?3
+            "UPDATE memories SET superseded_by = ?2, superseded_at = ?3, superseded_seq = ?4
              WHERE record_digest = ?1",
-            params![retired, replacement, at],
+            params![retired, replacement, at, now_seq],
         )?;
         tx_conn.execute(
             "INSERT OR IGNORE INTO provenance_edges VALUES (?1,?2,'supersedes',?3)",

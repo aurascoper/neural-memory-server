@@ -25,6 +25,7 @@ fn claim(s: &Store, text: &str) -> String {
             harness_run_id: None,
         },
         occurred_at: None,
+        recorded_at: None,
         derivation: None,
     };
     s.put_memory(WriteChannel::Operator, &w).unwrap().0
@@ -124,6 +125,7 @@ fn every_advertised_tool_is_dispatchable_and_schema_shaped() {
             "trace_provenance",
             "remember",
             "submit_answer",
+            "as_of",
             "flag_contradiction"
         ]
     );
@@ -329,6 +331,7 @@ fn recall_uses_the_session_as_of_when_none_is_given() {
             harness_run_id: None,
         },
         occurred_at: Some("2026-01-01T00:00:00Z"),
+        recorded_at: Some("2026-01-01T00:00:00Z"),
         derivation: None,
     };
     s.put_memory(WriteChannel::Operator, &w).unwrap();
@@ -414,6 +417,7 @@ fn get_record_returns_observations_with_their_metric_and_reference() {
             harness_run_id: None,
         },
         occurred_at: None,
+        recorded_at: None,
         derivation: None,
     };
     let (digest, _) = s.put_memory(WriteChannel::Operator, &w).unwrap();

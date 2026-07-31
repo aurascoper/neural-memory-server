@@ -467,7 +467,14 @@ pub fn ingest(store: &Store, text: &str, dry_run: bool) -> Result<IngestReport, 
                 observation_identities: obs?,
                 harness_run_id: doc.run_id.clone(),
             },
+            // Valid time: per-claim if given, else the document's instant.
             occurred_at: c.occurred_at.as_deref().or(Some(&at)),
+            // Transaction time: ALWAYS the document's instant. Copying
+            // occurred_at here would collapse the two axes that
+            // docs/temporal-queries.md exists to separate -- a claim about
+            // something that happened last year is not a claim the store held
+            // last year.
+            recorded_at: Some(&at),
             derivation,
         };
         let (id, wrote) = target

@@ -82,6 +82,7 @@ fn re_running_an_import_adds_no_rows_and_no_history() {
     let w = MemoryWrite {
         terms,
         occurred_at: Some(NOW),
+        recorded_at: Some(NOW),
         derivation: None,
     };
 
@@ -155,6 +156,7 @@ fn a_different_claim_is_a_different_record() {
             harness_run_id: None,
         },
         occurred_at: None,
+        recorded_at: None,
         derivation: None,
     };
     let (a, _) = s.put_memory(WriteChannel::Operator, &mk("one")).unwrap();
@@ -183,6 +185,7 @@ fn an_agent_cannot_write_anything_above_agent_inference() {
             harness_run_id: None,
         },
         occurred_at: None,
+        recorded_at: None,
         derivation: None,
     };
     let (digest, _) = s.put_memory(WriteChannel::Agent, &w).unwrap();
@@ -217,6 +220,7 @@ fn an_operator_may_write_observed_when_the_artifact_exists() {
             harness_run_id: None,
         },
         occurred_at: None,
+        recorded_at: None,
         derivation: None,
     };
     assert!(s.put_memory(WriteChannel::Operator, &w).is_ok());
@@ -235,6 +239,7 @@ fn observed_without_an_artifact_is_refused() {
             harness_run_id: None,
         },
         occurred_at: None,
+        recorded_at: None,
         derivation: None,
     };
     match s.put_memory(WriteChannel::Operator, &w) {
@@ -256,6 +261,7 @@ fn observed_citing_an_unknown_artifact_is_refused() {
             harness_run_id: None,
         },
         occurred_at: None,
+        recorded_at: None,
         derivation: None,
     };
     assert!(matches!(
@@ -286,6 +292,7 @@ fn the_documented_vulkan_speedup_recomputes_from_its_two_inputs() {
             harness_run_id: None,
         },
         occurred_at: None,
+        recorded_at: None,
         derivation: Some(Derivation::Ratio {
             numerator: vk,
             denominator: cpu,
@@ -312,6 +319,7 @@ fn a_derivation_that_does_not_recompute_is_refused() {
             harness_run_id: None,
         },
         occurred_at: None,
+        recorded_at: None,
         derivation: Some(Derivation::Ratio {
             numerator: vk,
             denominator: cpu,
@@ -345,6 +353,7 @@ fn derived_without_a_named_transform_is_refused() {
             harness_run_id: None,
         },
         occurred_at: None,
+        recorded_at: None,
         derivation: None,
     };
     assert!(matches!(
@@ -368,6 +377,7 @@ fn a_derivation_over_an_unknown_input_cannot_be_checked_and_is_refused() {
             harness_run_id: None,
         },
         occurred_at: None,
+        recorded_at: None,
         derivation: Some(Derivation::Ratio {
             numerator: vk,
             denominator: "dd".repeat(32),
@@ -424,6 +434,7 @@ fn the_smt_penalty_forces_its_baseline_to_be_named() {
             harness_run_id: None,
         },
         occurred_at: None,
+        recorded_at: None,
         derivation: Some(Derivation::PercentChange {
             value: value.to_string(),
             baseline: baseline.to_string(),
@@ -491,6 +502,7 @@ fn supersession_retires_without_deleting_and_records_the_edge() {
             harness_run_id: None,
         },
         occurred_at: None,
+        recorded_at: None,
         derivation: None,
     };
     let (old, _) = s

@@ -168,6 +168,26 @@ nothing. There is no SQL tool.
 `submit_answer` is **checked, not trusted**: if a cited record has an unresolved
 conflict, submission is rejected until it is acknowledged.
 
+### Two time axes
+
+`docs/temporal-queries.md` records the three queries that justified building
+this, written *before* the migration so the design answers a stated need:
+auditing a past decision on the evidence then available, finding results
+reported under an instrument later found broken, and detecting a claim resting
+on evidence already retired when it was made.
+
+- **Valid time** (`occurred_at`) — when a claim was true of the world.
+- **Transaction time** (`recorded_seq`, monotonic) — when the store came to
+  believe it. No clock is involved in the ordering.
+
+`as_of` reconstructs belief at a past point: claims since retired come back,
+claims not yet written stay absent. Retiring something today does not make it
+retired yesterday.
+
+Deliberately absent: `tstzrange`, exclusion constraints, Allen relations. Those
+three queries need a sequence comparison, and hand-rolling six-predicate
+temporal joins for them would be machinery in search of a use.
+
 ### The assembler is append-only
 
 Following the measurement above, context assembly never re-emits, reorders or
@@ -215,7 +235,11 @@ exists, and are void if edited after a grading run.
   **changed the top hit on none of them**; on two queries the extra records were
   plainly off-topic. It is correct and it is not yet earning its keep. See
   [Retrieval](#retrieval).
-- **Still unbuilt**: temporal queries, as-of time travel.
+- **Transaction time is unknown for early records.** Everything written before
+  migration 0003 has an ordering (`recorded_seq`) but no `recorded_at` instant,
+  so `as_of` on a date in that range reports `unknownBefore` rather than
+  guessing. Permanent for those rows — backfilling `occurred_at` into it would
+  conflate the two axes the split exists to separate.
 - **Concurrency is untested.** One SQLite file, WAL mode, multiple clients.
 - **No backup procedure.** Backup is copying the file; that is not the same as
   having tested a restore.

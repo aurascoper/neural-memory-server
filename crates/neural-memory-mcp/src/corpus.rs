@@ -65,6 +65,7 @@ impl Import<'_> {
                 harness_run_id: Some("gpd-characterization-20260730".into()),
             },
             occurred_at: Some(AT),
+            recorded_at: Some(AT),
             derivation: None,
         };
         let (d, wrote) = self

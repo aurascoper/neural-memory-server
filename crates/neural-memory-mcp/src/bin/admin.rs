@@ -171,6 +171,7 @@ fn run(cmd: &str, m: &HashMap<String, String>) -> Result<String, String> {
                     harness_run_id: None,
                 },
                 occurred_at: m.get("at").map(String::as_str),
+                recorded_at: m.get("at").map(String::as_str),
                 derivation: None,
             };
             let (d, wr) = store

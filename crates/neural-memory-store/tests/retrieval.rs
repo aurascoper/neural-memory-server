@@ -22,6 +22,7 @@ fn claim(s: &Store, text: &str, occurred_at: Option<&str>) -> String {
             harness_run_id: None,
         },
         occurred_at,
+        recorded_at: occurred_at,
         derivation: None,
     };
     s.put_memory(WriteChannel::Operator, &w).unwrap().0

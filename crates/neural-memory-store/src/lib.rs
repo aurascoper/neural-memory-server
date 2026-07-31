@@ -13,6 +13,7 @@ pub mod entity;
 pub mod ingest;
 pub mod migrate;
 pub mod retrieval;
+pub mod temporal;
 pub mod vector;
 pub mod write;
 
@@ -23,6 +24,7 @@ pub use retrieval::{
     Branch, BranchCounts, ConflictObligation, Direction, EdgeDetail, Hit, ObservationDetail,
     ProvenanceStep, RecallOptions, RecallResult, RecordDetail,
 };
+pub use temporal::{BeliefAt, SeqAt, TimelineEntry};
 pub use vector::{VectorError, VectorHit};
 pub use write::{EvidenceRefusal, MemoryWrite, WriteChannel, WriteError, Wrote};
 

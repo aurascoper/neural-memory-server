@@ -15,6 +15,11 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
         "embeddings",
         include_str!("../migrations/0002_embeddings.sql"),
     ),
+    (
+        3,
+        "temporal",
+        include_str!("../migrations/0003_temporal.sql"),
+    ),
 ];
 
 /// Highest migration this build knows about. Exposed so tests track the list
