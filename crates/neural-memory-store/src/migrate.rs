@@ -3,7 +3,7 @@
 //! Migrations are embedded with `include_str!` rather than read from disk, so a
 //! built binary cannot disagree with the schema it was tested against.
 
-use rusqlite::Connection;
+use rusqlite::{Connection, TransactionBehavior};
 
 use crate::StoreError;
 
@@ -35,16 +35,37 @@ pub fn apply_all(conn: &mut Connection) -> Result<(), StoreError> {
     )?;
 
     for (version, name, sql) in MIGRATIONS {
-        let already: i64 = conn.query_row(
-            "SELECT count(*) FROM schema_migrations WHERE version = ?1",
-            [version],
-            |r| r.get(0),
-        )?;
-        if already > 0 {
+        // Cheap unlocked pre-check. The steady state is "everything already
+        // applied", and that path must not take a write lock merely to discover
+        // there is nothing to do -- every session start runs this.
+        if applied(conn, *version)? {
             continue;
         }
+
         // Each migration is one transaction: a failure leaves no partial schema.
-        let tx = conn.transaction()?;
+        //
+        // IMMEDIATE, not the default DEFERRED. A deferred transaction takes its
+        // write lock at the first write, which is the migration SQL itself, so
+        // two processes could both pass the check above, both begin, and both
+        // run the same DDL -- one wins and the other fails on an object that
+        // now exists. That is not hypothetical: with eight processes opening a
+        // fresh store, one run in three produced
+        // `0002_embeddings: duplicate column name: identity`. It survived a
+        // first clean run and only appeared on the second, which is exactly
+        // why three consecutive runs were required rather than one.
+        //
+        // IMMEDIATE takes the write lock at BEGIN and *does* honour
+        // `busy_timeout`, so the losers wait rather than fail.
+        let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        // Re-check inside the lock. The pre-check above is only an optimisation
+        // and is worthless on its own -- the winner may have committed this very
+        // migration between that read and this BEGIN.
+        if applied(&tx, *version)? {
+            tx.rollback()?;
+            continue;
+        }
+
         tx.execute_batch(sql)
             .map_err(|e| StoreError::Migration(format!("{version:04}_{name}: {e}")))?;
         tx.execute(
@@ -55,6 +76,15 @@ pub fn apply_all(conn: &mut Connection) -> Result<(), StoreError> {
         tx.commit()?;
     }
     Ok(())
+}
+
+fn applied(conn: &Connection, version: i64) -> Result<bool, StoreError> {
+    let n: i64 = conn.query_row(
+        "SELECT count(*) FROM schema_migrations WHERE version = ?1",
+        [version],
+        |r| r.get(0),
+    )?;
+    Ok(n > 0)
 }
 
 /// Highest applied migration version, or 0.

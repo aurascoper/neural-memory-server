@@ -40,3 +40,7 @@ path = "src/bin/embed.rs"
 [[bin]]
 name = "neural-memory-eval-retrieval"
 path = "src/bin/eval-retrieval.rs"
+
+[[bin]]
+name = "neural-memory-bench-durability"
+path = "src/bin/bench-durability.rs"

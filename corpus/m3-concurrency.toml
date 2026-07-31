@@ -1,0 +1,205 @@
+# M3: concurrency. Two defects found prospectively, and the invariants that
+# now hold.
+#
+# Hand-written, unlike corpus/m3-durability.toml. The pass counts below are
+# transcribed from a real run and the suite digests pin exactly which tests
+# produced them -- change a test and the digest changes, so this attestation
+# stops applying to it.
+#
+# Both defects were found by writing the test BEFORE assuming which failures
+# existed. Neither was on the list of things I expected to fix: the plan named
+# `busy_timeout` as the likely culprit and busy_timeout turned out to be
+# correct already.
+
+version = 1
+run_id = "m3-concurrency"
+recorded_at = "2026-07-31T19:45:00Z"
+
+[[artifact]]
+id = "threads"
+kind = "test-source"
+sha256 = "2bb04d3765c34b3007afde745dcbd7d4f8c92b1e59a01f9868c7bbd588857b09"
+bytes = 13170
+media_type = "text/x-rust"
+uri = "file:///crates/neural-memory-store/tests/concurrency.rs"
+
+[[artifact]]
+id = "procs"
+kind = "test-source"
+sha256 = "00e36617dba409cf006066dfb490aee440d65cc3b7b281dd3f59d47aeec64163"
+bytes = 4749
+media_type = "text/x-rust"
+uri = "file:///crates/neural-memory-store/tests/concurrency_processes.rs"
+
+[[policy]]
+id = "repeat"
+metric = "consecutiveCleanRuns"
+aggregation = "countOfRuns"
+comparison_rule = "mustAllPass"
+unit = "run"
+
+[[suite]]
+id = "conc"
+name = "concurrency-repeat-25"
+case_texts = [
+  "concurrent_writers_all_land_and_the_sequence_never_reuses",
+  "a_reader_never_observes_a_half_applied_ingest",
+  "the_busy_timeout_is_what_absorbs_write_contention",
+  "a_failed_write_under_contention_leaves_nothing_behind",
+  "opening_the_same_store_many_times_concurrently_is_safe",
+  "reads_stay_available_while_a_writer_holds_a_transaction",
+  "journal_mode_is_wal_on_every_connection",
+  "commits_are_fsynced",
+  "migration_race_on_cold_open",
+  "opening_an_already_migrated_store_concurrently_is_a_no_op",
+]
+tokenizer = "none"
+context_cap = 1
+
+[[observation]]
+id = "o_threads"
+kind = "concurrencySuiteCleanRuns.threads"
+quantity = "absolute"
+value = "25"
+policy = "repeat"
+suite = "conc"
+runtime = "ryzen-ai-9-hx-370-ext4-nvme"
+artifact = "threads"
+
+[[observation]]
+id = "o_procs"
+kind = "concurrencySuiteCleanRuns.processes"
+quantity = "absolute"
+value = "25"
+policy = "repeat"
+suite = "conc"
+runtime = "ryzen-ai-9-hx-370-ext4-nvme"
+artifact = "procs"
+
+# ---------------------------------------------------------------------------
+# What now holds
+# ---------------------------------------------------------------------------
+
+[[claim]]
+id = "c_threads"
+text = "The thread-level concurrency suite passed 25 of 25 consecutive runs after the WAL and migration fixes"
+evidence = "observed"
+artifact = "threads"
+locator = "tests/concurrency.rs"
+observations = ["o_threads"]
+
+[[claim]]
+id = "c_procs"
+text = "The multi-process migration race suite passed 25 of 25 consecutive runs after the WAL and migration fixes"
+evidence = "observed"
+artifact = "procs"
+locator = "tests/concurrency_processes.rs"
+observations = ["o_procs"]
+
+# ---------------------------------------------------------------------------
+# The two defects. `external` rather than `observed`: the pre-fix source was
+# replaced, so there is no artifact left to attest them against. Recording them
+# as observations would claim evidence that no longer exists -- the same reason
+# the Track A checker bugs are external.
+# ---------------------------------------------------------------------------
+
+[[claim]]
+id = "c_bug_wal"
+text = "PRAGMA journal_mode=WAL returns SQLITE_BUSY immediately and does not invoke the busy handler, so busy_timeout does not cover it; with eight processes opening a fresh store, three failed with database is locked on each of three consecutive runs while busy_timeout read back as 5000 ms"
+evidence = "external"
+locator = "M3 concurrency"
+
+[[claim]]
+id = "c_bug_migrate"
+text = "The migration runner checked whether a migration was applied outside the transaction that applies it and used a DEFERRED transaction, so two processes could both pass the check and both run the same DDL; this produced 0002_embeddings duplicate column name identity on one run in three"
+evidence = "external"
+locator = "M3 concurrency"
+
+[[claim]]
+id = "c_fix_wal"
+text = "journal_mode is a persistent property of the file, so Store::open now reads it first and only attempts the switch when it is not already WAL, with bounded retry for the cold-create case where every process legitimately contends"
+evidence = "decision"
+locator = "M3 concurrency"
+
+[[claim]]
+id = "c_fix_migrate"
+text = "Migrations now use BEGIN IMMEDIATE, which takes the write lock at BEGIN and does honour busy_timeout, and re-check inside the lock; the unlocked pre-check is retained only so the steady state takes no write lock"
+evidence = "decision"
+locator = "M3 concurrency"
+
+# ---------------------------------------------------------------------------
+# Method
+# ---------------------------------------------------------------------------
+
+[[claim]]
+id = "c_three_runs"
+text = "The migration race defect survived a first clean run and appeared on the second, so a concurrency test that passes once has demonstrated nothing; three consecutive clean runs was pre-registered as the minimum and is what caught it"
+evidence = "decision"
+locator = "M3 concurrency"
+
+[[claim]]
+id = "c_negative_control"
+text = "A concurrency test that passes proves nothing unless the contention is real, so the suite removes the busy handler and asserts the second writer fails, then restores it and asserts the same write succeeds"
+evidence = "decision"
+locator = "M3 concurrency"
+
+[[claim]]
+id = "c_busy_timeout_was_fine"
+text = "rusqlite already sets busy_timeout to 5000 ms, so the fix the plan anticipated was for a defect that did not exist; both real defects were elsewhere and neither was predicted"
+evidence = "external"
+locator = "M3 concurrency"
+
+[[claim]]
+id = "c_default_deployment"
+text = "The MCP server is registered user-scope, so every Claude Code session spawns a process against one SQLite file and concurrent access is the default deployment rather than an edge case"
+evidence = "external"
+locator = "M3 concurrency"
+
+# ---------------------------------------------------------------------------
+# Wiring
+# ---------------------------------------------------------------------------
+
+[[edge]]
+from = "c_fix_wal"
+to = "c_bug_wal"
+kind = "derivedFrom"
+
+[[edge]]
+from = "c_fix_migrate"
+to = "c_bug_migrate"
+kind = "derivedFrom"
+
+[[edge]]
+from = "c_threads"
+to = "c_fix_wal"
+kind = "supports"
+
+[[edge]]
+from = "c_procs"
+to = "c_fix_wal"
+kind = "supports"
+
+[[edge]]
+from = "c_procs"
+to = "c_fix_migrate"
+kind = "supports"
+
+[[edge]]
+from = "c_three_runs"
+to = "c_bug_migrate"
+kind = "derivedFrom"
+
+[[edge]]
+from = "c_busy_timeout_was_fine"
+to = "c_bug_wal"
+kind = "contradicts"
+
+[[edge]]
+from = "c_default_deployment"
+to = "c_bug_migrate"
+kind = "supports"
+
+[[edge]]
+from = "c_negative_control"
+to = "c_threads"
+kind = "supports"

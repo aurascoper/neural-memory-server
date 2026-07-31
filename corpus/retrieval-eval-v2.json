@@ -1,0 +1,1190 @@
+{
+  "preRegisteredAt": "2026-07-31",
+  "supersedes": "corpus/retrieval-eval.json (n=5 per class)",
+  "preRegistrationNote": "Queries, relevance labels, metric and pass conditions fixed BEFORE any v2 arm was run. Void if edited after a run. Relevance judged as 'would a careful reader say this record answers the question', not 'which branch would find it'. The 20 v1 queries are carried through byte-for-byte and marked v1:true so the replication subset is separable.",
+  "whyReplicationSubset": "The store grew from 75 records to 92 between v1 and v2, and embedding coverage went from 26 records to all of them. A change in the v2 result could therefore be the larger n, the larger corpus, or the fuller embedding coverage. Re-running the identical 20 v1 queries against the current store separates the first from the other two.",
+  "knownBias": "The same author wrote the corpus, the branches and these queries. Paraphrases I choose may be ones the embedder happens to handle. This is a real limitation and no result here should be read as generalising beyond this corpus. It is mitigated only by fixing labels in advance and reporting per class rather than in aggregate.",
+  "aliasClassCaveat": "Sharper than the general author bias and specific to C_alias: an alias query is a query the author wrote using an alias the author also wrote, declared in corpus/entities-m3.toml. The class measures whether the entity branch works as designed. It does not measure whether it helps on queries someone else would ask, and no result here should be read as if it did.",
+  "labellingRules": [
+    "Labels are record digests, not positions, so a supersede cannot silently move a label.",
+    "Ten claim texts exist at two digests each; a label on one is expanded to both automatically.",
+    "Retired records are never labelled relevant: default recall excludes them, so a retired target would be unreachable and would depress every arm equally."
+  ],
+  "whyPerClass": "An aggregate number would hide the answer. Semantic is supposed to win on paraphrase and lose nothing on verbatim; averaging those together produces a single figure that is true and uninformative.",
+  "metric": "recall@5 and MRR@10, macro-averaged within each class",
+  "arms": {
+    "lexical": "FTS5 only. semantic off, entities off, maxHops 0",
+    "lexical+semantic": "semantic on, entities off, maxHops 0",
+    "lexical+entity": "semantic off, entities on, maxHops 0",
+    "all": "everything on, maxHops 1"
+  },
+  "passConditions": {
+    "semantic": "JUSTIFIED if it raises mean MRR on classes B and D by >= 0.05 absolute over lexical alone, AND lowers mean MRR on class A by no more than 0.05. Otherwise NOT JUSTIFIED on this corpus.",
+    "entity": "JUSTIFIED if it raises mean MRR on class C by >= 0.05 over lexical alone, AND lowers no other class by more than 0.05."
+  },
+  "classes": {
+    "A_verbatim": "wording lifted from the record; lexical should win",
+    "B_paraphrase": "same meaning, different words; semantic should win if it works at all",
+    "C_alias": "uses a declared entity alias; entity should win",
+    "D_conceptual": "asks about a topic without naming specifics; hardest for all branches"
+  },
+  "queries": [
+    {
+      "id": "A1",
+      "class": "A_verbatim",
+      "q": "maximum absolute logit delta 4.3362",
+      "relevant": [
+        "d011746769a103a805b507e410a472ee7d1137b7ca7013327d136750b7d6ce32"
+      ],
+      "v1": true
+    },
+    {
+      "id": "A2",
+      "class": "A_verbatim",
+      "q": "logits tolerance 0.5 pre-registered on principle",
+      "relevant": [
+        "e58b3655b894d53e66bab99e301d249b56cfdfb7efbedfe0fe94ea5835230a8b"
+      ],
+      "v1": true
+    },
+    {
+      "id": "A3",
+      "class": "A_verbatim",
+      "q": "generated 11.55 tokens per second at 8 threads",
+      "relevant": [
+        "5270f02fe40586235c2de2f112ccadf7e7b9e070a0ed018cafb52e63a67bec50"
+      ],
+      "v1": true
+    },
+    {
+      "id": "A4",
+      "class": "A_verbatim",
+      "q": "model-variant.schema.json numericalContractId required properties",
+      "relevant": [
+        "503bfc181783b0c0618b46b28e3028e103d6e047d158513837cf0cfcbff6e3d5"
+      ],
+      "v1": true
+    },
+    {
+      "id": "A5",
+      "class": "A_verbatim",
+      "q": "prompt tokens per second on Vulkan under AC power",
+      "relevant": [
+        "fdb23d4b11a3f2a8440dcc18f82b91f0d72784d49910b4bda2c4a0cc54b1d3ae"
+      ],
+      "v1": true
+    },
+    {
+      "id": "B1",
+      "class": "B_paraphrase",
+      "q": "how far apart were the graphics and processor numbers for Gemma",
+      "relevant": [
+        "d011746769a103a805b507e410a472ee7d1137b7ca7013327d136750b7d6ce32",
+        "5bc837e1ceda3d989b53887225e8abc4b0eedeee05313a79e2904c8a79f32cc3"
+      ],
+      "v1": true
+    },
+    {
+      "id": "B2",
+      "class": "B_paraphrase",
+      "q": "what threshold was fixed in advance before measuring",
+      "relevant": [
+        "e58b3655b894d53e66bab99e301d249b56cfdfb7efbedfe0fe94ea5835230a8b"
+      ],
+      "v1": true
+    },
+    {
+      "id": "B3",
+      "class": "B_paraphrase",
+      "q": "which thread count gave the fastest text output",
+      "relevant": [
+        "5270f02fe40586235c2de2f112ccadf7e7b9e070a0ed018cafb52e63a67bec50"
+      ],
+      "v1": true
+    },
+    {
+      "id": "B4",
+      "class": "B_paraphrase",
+      "q": "can a variant simply leave the contract field out",
+      "relevant": [
+        "503bfc181783b0c0618b46b28e3028e103d6e047d158513837cf0cfcbff6e3d5"
+      ],
+      "v1": true
+    },
+    {
+      "id": "B5",
+      "class": "B_paraphrase",
+      "q": "does running unplugged change the speed",
+      "relevant": [
+        "fdb23d4b11a3f2a8440dcc18f82b91f0d72784d49910b4bda2c4a0cc54b1d3ae",
+        "5bc5a0fe8d53159bee23481899dac7df8d7a9174a3af2329a1c8aa50813e2c21"
+      ],
+      "v1": true
+    },
+    {
+      "id": "C1",
+      "class": "C_alias",
+      "q": "correctness escalation candidate divergence",
+      "relevant": [
+        "d011746769a103a805b507e410a472ee7d1137b7ca7013327d136750b7d6ce32",
+        "5bc837e1ceda3d989b53887225e8abc4b0eedeee05313a79e2904c8a79f32cc3"
+      ],
+      "v1": true
+    },
+    {
+      "id": "C2",
+      "class": "C_alias",
+      "q": "what did the responsive default do at 24 threads",
+      "relevant": [
+        "57df45becb5bf85b5ad2dd30123dce95c8bede7d56d5623dcbbe38a8562f3430"
+      ],
+      "v1": true
+    },
+    {
+      "id": "C3",
+      "class": "C_alias",
+      "q": "the GPU path against the reference backend",
+      "relevant": [
+        "d011746769a103a805b507e410a472ee7d1137b7ca7013327d136750b7d6ce32",
+        "544381f674842a3f1b48a88c3a226e7a7df33455d06daba56b8f8b5c9fcc5831"
+      ],
+      "v1": true
+    },
+    {
+      "id": "C4",
+      "class": "C_alias",
+      "q": "balanced experimental alternative throughput",
+      "relevant": [
+        "fdb23d4b11a3f2a8440dcc18f82b91f0d72784d49910b4bda2c4a0cc54b1d3ae"
+      ],
+      "v1": true
+    },
+    {
+      "id": "C5",
+      "class": "C_alias",
+      "q": "the seal and the contract id",
+      "relevant": [
+        "ba79ced4d2411ebd69ce4c7a0f9643c5eaa655eb7784ab540f92fcdb86bdb3f5",
+        "503bfc181783b0c0618b46b28e3028e103d6e047d158513837cf0cfcbff6e3d5",
+        "8b61ff22e6a0ed42676573353133bc4c2a8a9df2e5ce45d4a72160e93aa2a976"
+      ],
+      "v1": true
+    },
+    {
+      "id": "D1",
+      "class": "D_conceptual",
+      "q": "why can the two backends not share a contract",
+      "relevant": [
+        "99d168fd462add2add6cc7be308427693b93275f6cf37d648f9192addbc69a3f",
+        "ba79ced4d2411ebd69ce4c7a0f9643c5eaa655eb7784ab540f92fcdb86bdb3f5",
+        "6d504ee6f0f5c99663cb1ed1e3afe4ac242d9d3549bc9134823b7d4e1044ef0f"
+      ],
+      "v1": true
+    },
+    {
+      "id": "D2",
+      "class": "D_conceptual",
+      "q": "is there an ambiguity in how a percentage was computed",
+      "relevant": [
+        "8646ebf32d8d78930a7359d2de39933721451c3a95ea61825af4171d98c579ba",
+        "0fdc8d16699f674c1850502e65aacba6731de41c9a6dfa47a5599bdd1bba20a6",
+        "13d4a89ecb0b157e0bea3a681d576fecd6e594ede97cb8f5ea44e6230bc7ba2d"
+      ],
+      "v1": true
+    },
+    {
+      "id": "D3",
+      "class": "D_conceptual",
+      "q": "what evidence is still missing",
+      "relevant": [
+        "99d168fd462add2add6cc7be308427693b93275f6cf37d648f9192addbc69a3f",
+        "48e1aa1d1a4950ad9f7b3b76cac2e80df5dae49af6780626148c77b7ea5c9f63",
+        "7b8dc84bcb7daa2b246e5aac9419213254d46e8c99c0bf6ee55200c98c8c98d0"
+      ],
+      "v1": true
+    },
+    {
+      "id": "D4",
+      "class": "D_conceptual",
+      "q": "does caching change the cost of a long prompt",
+      "relevant": [
+        "5b87b2a0fce65086de744e4aa54f950a1ea08ee26beb4dac854886f422c520bb",
+        "7b05039561a3732fc68bd7dbce869e44c46faad2e81788e07f8278e9be7364eb",
+        "a4c01ad4881298985e8420cf20b7580046e9e6f77c0b46d043b52018fd32b767"
+      ],
+      "v1": true
+    },
+    {
+      "id": "D5",
+      "class": "D_conceptual",
+      "q": "what happens to generation when you use too many threads",
+      "relevant": [
+        "57df45becb5bf85b5ad2dd30123dce95c8bede7d56d5623dcbbe38a8562f3430",
+        "8646ebf32d8d78930a7359d2de39933721451c3a95ea61825af4171d98c579ba",
+        "0fdc8d16699f674c1850502e65aacba6731de41c9a6dfa47a5599bdd1bba20a6",
+        "13d4a89ecb0b157e0bea3a681d576fecd6e594ede97cb8f5ea44e6230bc7ba2d"
+      ],
+      "v1": true
+    },
+    {
+      "id": "A6",
+      "class": "A_verbatim",
+      "q": "maximum absolute logit delta of 2.3901 against the CPU reference execution",
+      "relevant": [
+        "544381f674842a3f1b48a88c3a226e7a7df33455d06daba56b8f8b5c9fcc5831"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A7",
+      "class": "A_verbatim",
+      "q": "single prompt greedy decoding no chat template 32 steps",
+      "relevant": [
+        "18237355295603cea7c33ba5c31614f3d1d9cb95979311b1bdaf263aba6d36c1"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A8",
+      "class": "A_verbatim",
+      "q": "first diverged from the CPU reference at greedy step 52",
+      "relevant": [
+        "5bc837e1ceda3d989b53887225e8abc4b0eedeee05313a79e2904c8a79f32cc3"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A9",
+      "class": "A_verbatim",
+      "q": "exceeding a declared tolerance is a different contract not a failed test",
+      "relevant": [
+        "6d1c0f618e53dd95b39a3a5a65b12bd92be9fc0244813574b0a8334a4ddd5dff"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A10",
+      "class": "A_verbatim",
+      "q": "RequiresSeparateNumericalContract publishes under its own numericalContractId",
+      "relevant": [
+        "ba79ced4d2411ebd69ce4c7a0f9643c5eaa655eb7784ab540f92fcdb86bdb3f5"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A11",
+      "class": "A_verbatim",
+      "q": "variant_binds_to_contract compares a variant's id to the seal of a policy",
+      "relevant": [
+        "8b61ff22e6a0ed42676573353133bc4c2a8a9df2e5ce45d4a72160e93aa2a976"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A12",
+      "class": "A_verbatim",
+      "q": "the binding path is mechanically open and the missing piece is a decision",
+      "relevant": [
+        "6d504ee6f0f5c99663cb1ed1e3afe4ac242d9d3549bc9134823b7d4e1044ef0f"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A13",
+      "class": "A_verbatim",
+      "q": "AC and battery prompt-processing figures do not differ by a uniform offset",
+      "relevant": [
+        "5bc5a0fe8d53159bee23481899dac7df8d7a9174a3af2329a1c8aa50813e2c21"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A14",
+      "class": "A_verbatim",
+      "q": "conformance corpus of 20 to 50 frozen prompts",
+      "relevant": [
+        "48e1aa1d1a4950ad9f7b3b76cac2e80df5dae49af6780626148c77b7ea5c9f63"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A15",
+      "class": "A_verbatim",
+      "q": "the conformance schema names no reference execution evaluation suite or measurement policy",
+      "relevant": [
+        "7b8dc84bcb7daa2b246e5aac9419213254d46e8c99c0bf6ee55200c98c8c98d0"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A16",
+      "class": "A_verbatim",
+      "q": "generated 8.38 tokens per second at 24 threads",
+      "relevant": [
+        "57df45becb5bf85b5ad2dd30123dce95c8bede7d56d5623dcbbe38a8562f3430"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A17",
+      "class": "A_verbatim",
+      "q": "generated 11.45 tokens per second at 12 threads",
+      "relevant": [
+        "72c3308000938698830f36bf5c5c5fe239e085f7bc10031592b6f9d2f9c30a23"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A18",
+      "class": "A_verbatim",
+      "q": "generated 11.40 tokens per second at 16 threads",
+      "relevant": [
+        "fbc812fd786fa751f4a6c034f816f5f20958a86e27a21be1dfc9e8b19453b788"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A19",
+      "class": "A_verbatim",
+      "q": "changes by -27.4 percent against the 8-thread baseline",
+      "relevant": [
+        "8646ebf32d8d78930a7359d2de39933721451c3a95ea61825af4171d98c579ba"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A20",
+      "class": "A_verbatim",
+      "q": "changes by -26.8 percent against the 12-thread baseline",
+      "relevant": [
+        "0fdc8d16699f674c1850502e65aacba6731de41c9a6dfa47a5599bdd1bba20a6"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A21",
+      "class": "A_verbatim",
+      "q": "states the 24-thread generation penalty without naming which baseline",
+      "relevant": [
+        "13d4a89ecb0b157e0bea3a681d576fecd6e594ede97cb8f5ea44e6230bc7ba2d"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A22",
+      "class": "A_verbatim",
+      "q": "speeds up a stable-prefix 8K prompt by 7.13 times",
+      "relevant": [
+        "7b05039561a3732fc68bd7dbce869e44c46faad2e81788e07f8278e9be7364eb"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A23",
+      "class": "A_verbatim",
+      "q": "no candidate may be scored until every checker has passed a known-pass fixture",
+      "relevant": [
+        "bb7a5151297ee7747bd85eb41efa986604a3c3cddb37f22bd48ccdcebc5d8c66"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A24",
+      "class": "A_verbatim",
+      "q": "the sentence splitter treated Dr. Ivo as a boundary",
+      "relevant": [
+        "10b7adeaf43268c5f7468767f1f05301828aafc7c299302ae2b170d293f39ee4"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A25",
+      "class": "A_verbatim",
+      "q": "the pattern for 240 did not match 240ms",
+      "relevant": [
+        "741f980b34d13b3d8506b79b6e85a1cd359bb1d50f0885e115734fb1454cfc1e"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A26",
+      "class": "A_verbatim",
+      "q": "the privacy fixture leaked all four identifiers at once",
+      "relevant": [
+        "c118c32f64b37d4a28fe0c10e8d26927bc9bcc38e0d2cca2422b7b278baedc58"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A27",
+      "class": "A_verbatim",
+      "q": "kill 107 of 129 systematic mutants a score of 0.829",
+      "relevant": [
+        "d9412e41193ff24c3454afb4f791ef88b01f43adab82dcb1f580c319143ccd45"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A28",
+      "class": "A_verbatim",
+      "q": "singleCommit write costs 933.6 us per claim at synchronous=FULL",
+      "relevant": [
+        "299cf8701fb58408c38ed094907f9cf1571126b2cddbcf578a396379f67a6585"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A29",
+      "class": "A_verbatim",
+      "q": "PRAGMA journal_mode=WAL returns SQLITE_BUSY immediately",
+      "relevant": [
+        "19ce0b0712dd8d126df549456cbb274c0e0a6e89f1c83c8eccf519d5b31502a0"
+      ],
+      "v1": false
+    },
+    {
+      "id": "A30",
+      "class": "A_verbatim",
+      "q": "VACUUM INTO on the live store takes 3.6 ms",
+      "relevant": [
+        "dabd424de5b9f489d6dad7c3bce56eb1d919027824099ea3298b9a20af98860b"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B6",
+      "class": "B_paraphrase",
+      "q": "how much did the eight billion model drift between the two backends",
+      "relevant": [
+        "544381f674842a3f1b48a88c3a226e7a7df33455d06daba56b8f8b5c9fcc5831"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B7",
+      "class": "B_paraphrase",
+      "q": "at which step did the larger model stop matching after looking fine earlier",
+      "relevant": [
+        "5bc837e1ceda3d989b53887225e8abc4b0eedeee05313a79e2904c8a79f32cc3"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B8",
+      "class": "B_paraphrase",
+      "q": "is going past the allowed limit a failure or something else",
+      "relevant": [
+        "6d1c0f618e53dd95b39a3a5a65b12bd92be9fc0244813574b0a8334a4ddd5dff"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B9",
+      "class": "B_paraphrase",
+      "q": "what does a backend do when it cannot share the reference guarantee",
+      "relevant": [
+        "ba79ced4d2411ebd69ce4c7a0f9643c5eaa655eb7784ab540f92fcdb86bdb3f5"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B10",
+      "class": "B_paraphrase",
+      "q": "does the binding check look at whether conformance passed",
+      "relevant": [
+        "8b61ff22e6a0ed42676573353133bc4c2a8a9df2e5ce45d4a72160e93aa2a976"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B11",
+      "class": "B_paraphrase",
+      "q": "is the blockage in the code or in a judgement nobody has made",
+      "relevant": [
+        "6d504ee6f0f5c99663cb1ed1e3afe4ac242d9d3549bc9134823b7d4e1044ef0f"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B12",
+      "class": "B_paraphrase",
+      "q": "can we just scale the unplugged numbers to match",
+      "relevant": [
+        "5bc5a0fe8d53159bee23481899dac7df8d7a9174a3af2329a1c8aa50813e2c21"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B13",
+      "class": "B_paraphrase",
+      "q": "how many fixed prompts are needed before claiming interchangeability",
+      "relevant": [
+        "48e1aa1d1a4950ad9f7b3b76cac2e80df5dae49af6780626148c77b7ea5c9f63"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B14",
+      "class": "B_paraphrase",
+      "q": "what was the slowest generation figure in the sweep",
+      "relevant": [
+        "57df45becb5bf85b5ad2dd30123dce95c8bede7d56d5623dcbbe38a8562f3430"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B15",
+      "class": "B_paraphrase",
+      "q": "how much worse does generation get with the most workers",
+      "relevant": [
+        "8646ebf32d8d78930a7359d2de39933721451c3a95ea61825af4171d98c579ba",
+        "0fdc8d16699f674c1850502e65aacba6731de41c9a6dfa47a5599bdd1bba20a6"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B16",
+      "class": "B_paraphrase",
+      "q": "is it clear what the minus twenty seven percent is compared against",
+      "relevant": [
+        "13d4a89ecb0b157e0bea3a681d576fecd6e594ede97cb8f5ea44e6230bc7ba2d"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B17",
+      "class": "B_paraphrase",
+      "q": "how long does a long prompt take when nothing is reused",
+      "relevant": [
+        "5b87b2a0fce65086de744e4aa54f950a1ea08ee26beb4dac854886f422c520bb",
+        "a4c01ad4881298985e8420cf20b7580046e9e6f77c0b46d043b52018fd32b767"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B18",
+      "class": "B_paraphrase",
+      "q": "how many times faster is a repeated long prompt",
+      "relevant": [
+        "7b05039561a3732fc68bd7dbce869e44c46faad2e81788e07f8278e9be7364eb"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B19",
+      "class": "B_paraphrase",
+      "q": "when is a model answer allowed to be graded",
+      "relevant": [
+        "bb7a5151297ee7747bd85eb41efa986604a3c3cddb37f22bd48ccdcebc5d8c66"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B20",
+      "class": "B_paraphrase",
+      "q": "why did a correct two-sentence reply get marked wrong",
+      "relevant": [
+        "10b7adeaf43268c5f7468767f1f05301828aafc7c299302ae2b170d293f39ee4"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B21",
+      "class": "B_paraphrase",
+      "q": "if every model gives the same result what should you suspect first",
+      "relevant": [
+        "26aac552d73b9a6e27943dee4e0ebd376d915ac30e1d11a5b9b22fb9adfbedcc"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B22",
+      "class": "B_paraphrase",
+      "q": "why was one branch per checker not enough coverage",
+      "relevant": [
+        "caa652cf24eb2b96dc4ccfd6ea320e967a8e58ad26d015edcaa97dd8e219e2c4"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B23",
+      "class": "B_paraphrase",
+      "q": "what does choosing your own defects fail to tell you",
+      "relevant": [
+        "5cec6ef3d2610fea5a0ec71cf76f1478f4ce81f5ddd8d5d5d8901fb31e24136a",
+        "64b4ee4c4c841544812caaec5c7861a45f9576137fde27cd7f0cd957bd297c6e"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B24",
+      "class": "B_paraphrase",
+      "q": "what fraction of generated defects do the fixtures catch",
+      "relevant": [
+        "d9412e41193ff24c3454afb4f791ef88b01f43adab82dcb1f580c319143ccd45"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B25",
+      "class": "B_paraphrase",
+      "q": "is a high kill rate proof the fixtures are good",
+      "relevant": [
+        "c1a46b954ad3a51b836e9d9d65c2e8cd53805dea553942b4e4b0510349db3823"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B26",
+      "class": "B_paraphrase",
+      "q": "why does the store flush every commit to disk",
+      "relevant": [
+        "a6602c8c99402f39b46d5f486a7b14e1ea1bb22cf5ca5d991d5ff26e86ed5b02"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B27",
+      "class": "B_paraphrase",
+      "q": "why did setting the journal mode fail even with a wait configured",
+      "relevant": [
+        "19ce0b0712dd8d126df549456cbb274c0e0a6e89f1c83c8eccf519d5b31502a0"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B28",
+      "class": "B_paraphrase",
+      "q": "how did two processes end up applying the same schema change",
+      "relevant": [
+        "2b89321734562c4c42efc7a92ce57ad997f3a6360e46452a262de3036936061d"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B29",
+      "class": "B_paraphrase",
+      "q": "why is passing once not enough for a timing sensitive test",
+      "relevant": [
+        "5292089be1e885bfc8899e4038a0ac1d75b354f325262a626012faa17febdab1"
+      ],
+      "v1": false
+    },
+    {
+      "id": "B30",
+      "class": "B_paraphrase",
+      "q": "how many processes normally touch the database at the same time",
+      "relevant": [
+        "95a939c9be3e29a8fcc210f5fd8741e8021c47f229c8ba8281887d38a97a3d84"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C6",
+      "class": "C_alias",
+      "q": "the responsive default across the core-count experiment",
+      "relevant": [
+        "57df45becb5bf85b5ad2dd30123dce95c8bede7d56d5623dcbbe38a8562f3430",
+        "5270f02fe40586235c2de2f112ccadf7e7b9e070a0ed018cafb52e63a67bec50",
+        "72c3308000938698830f36bf5c5c5fe239e085f7bc10031592b6f9d2f9c30a23",
+        "fbc812fd786fa751f4a6c034f816f5f20958a86e27a21be1dfc9e8b19453b788"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C7",
+      "class": "C_alias",
+      "q": "what did the Gate 0 experiment show",
+      "relevant": [
+        "5b87b2a0fce65086de744e4aa54f950a1ea08ee26beb4dac854886f422c520bb",
+        "7b05039561a3732fc68bd7dbce869e44c46faad2e81788e07f8278e9be7364eb",
+        "a4c01ad4881298985e8420cf20b7580046e9e6f77c0b46d043b52018fd32b767"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C8",
+      "class": "C_alias",
+      "q": "numerical drift on the GPU path",
+      "relevant": [
+        "d011746769a103a805b507e410a472ee7d1137b7ca7013327d136750b7d6ce32",
+        "544381f674842a3f1b48a88c3a226e7a7df33455d06daba56b8f8b5c9fcc5831"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C9",
+      "class": "C_alias",
+      "q": "kill rate from the mutant generator",
+      "relevant": [
+        "d9412e41193ff24c3454afb4f791ef88b01f43adab82dcb1f580c319143ccd45"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C10",
+      "class": "C_alias",
+      "q": "what do defects the author anticipated fail to measure",
+      "relevant": [
+        "5cec6ef3d2610fea5a0ec71cf76f1478f4ce81f5ddd8d5d5d8901fb31e24136a",
+        "64b4ee4c4c841544812caaec5c7861a45f9576137fde27cd7f0cd957bd297c6e"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C11",
+      "class": "C_alias",
+      "q": "when may the quality gate let a candidate through",
+      "relevant": [
+        "bb7a5151297ee7747bd85eb41efa986604a3c3cddb37f22bd48ccdcebc5d8c66"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C12",
+      "class": "C_alias",
+      "q": "the abbreviation bug in the boundary detector",
+      "relevant": [
+        "10b7adeaf43268c5f7468767f1f05301828aafc7c299302ae2b170d293f39ee4"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C13",
+      "class": "C_alias",
+      "q": "the journal mode and the busy handler",
+      "relevant": [
+        "19ce0b0712dd8d126df549456cbb274c0e0a6e89f1c83c8eccf519d5b31502a0",
+        "2ecaa21fd0a92b408c65383cca4caa01f7b7904ebd6651702d153a61bf77f8fe"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C14",
+      "class": "C_alias",
+      "q": "how long does the backup primitive hold things up",
+      "relevant": [
+        "dabd424de5b9f489d6dad7c3bce56eb1d919027824099ea3298b9a20af98860b"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C15",
+      "class": "C_alias",
+      "q": "the durability pragma and what it costs",
+      "relevant": [
+        "a6602c8c99402f39b46d5f486a7b14e1ea1bb22cf5ca5d991d5ff26e86ed5b02",
+        "db516c071646cb94782a920043a69c5adf8765d0127bd91b8993056ad2f7ee34"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C16",
+      "class": "C_alias",
+      "q": "taking the lock up front instead of deferring",
+      "relevant": [
+        "5751782e0385163463d288a7dd3b2c8a05655e67a9ea0c689623c302bfb41c0f"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C17",
+      "class": "C_alias",
+      "q": "how many sessions reach the agent surface at once",
+      "relevant": [
+        "95a939c9be3e29a8fcc210f5fd8741e8021c47f229c8ba8281887d38a97a3d84"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C18",
+      "class": "C_alias",
+      "q": "what does the database crate already set",
+      "relevant": [
+        "2f2e64ed5e5927ff077d31540706d7398321c20e629f24db0d5241cf327cded5"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C19",
+      "class": "C_alias",
+      "q": "the DDL runner and forward-only versioning",
+      "relevant": [
+        "2b89321734562c4c42efc7a92ce57ad997f3a6360e46452a262de3036936061d",
+        "5751782e0385163463d288a7dd3b2c8a05655e67a9ea0c689623c302bfb41c0f"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C20",
+      "class": "C_alias",
+      "q": "the numerical contract in the schema",
+      "relevant": [
+        "503bfc181783b0c0618b46b28e3028e103d6e047d158513837cf0cfcbff6e3d5"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C21",
+      "class": "C_alias",
+      "q": "the balanced experimental alternative on integrated graphics",
+      "relevant": [
+        "fdb23d4b11a3f2a8440dcc18f82b91f0d72784d49910b4bda2c4a0cc54b1d3ae"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C22",
+      "class": "C_alias",
+      "q": "the correctness escalation candidate and where it first disagreed",
+      "relevant": [
+        "d011746769a103a805b507e410a472ee7d1137b7ca7013327d136750b7d6ce32",
+        "5bc837e1ceda3d989b53887225e8abc4b0eedeee05313a79e2904c8a79f32cc3"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C23",
+      "class": "C_alias",
+      "q": "the 8B model at twenty four workers",
+      "relevant": [
+        "57df45becb5bf85b5ad2dd30123dce95c8bede7d56d5623dcbbe38a8562f3430"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C24",
+      "class": "C_alias",
+      "q": "the interactive model conformance delta",
+      "relevant": [
+        "544381f674842a3f1b48a88c3a226e7a7df33455d06daba56b8f8b5c9fcc5831"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C25",
+      "class": "C_alias",
+      "q": "the write-ahead log switch and why it failed",
+      "relevant": [
+        "19ce0b0712dd8d126df549456cbb274c0e0a6e89f1c83c8eccf519d5b31502a0"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C26",
+      "class": "C_alias",
+      "q": "clean runs after the fixes to the embedded database",
+      "relevant": [
+        "d4d3f60123fa9e823c54fee86d803985dbd10f28e391ba185c0d9bd8016bba31",
+        "7369750d06da8d61582c7c00d9800edcd03aa2571f0dcdeb7afbf8b22f886f1b"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C27",
+      "class": "C_alias",
+      "q": "the mutant generator floor on fixture quality",
+      "relevant": [
+        "d9412e41193ff24c3454afb4f791ef88b01f43adab82dcb1f580c319143ccd45",
+        "c1a46b954ad3a51b836e9d9d65c2e8cd53805dea553942b4e4b0510349db3823"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C28",
+      "class": "C_alias",
+      "q": "where the both-polarity pairs were too thin",
+      "relevant": [
+        "caa652cf24eb2b96dc4ccfd6ea320e967a8e58ad26d015edcaa97dd8e219e2c4",
+        "c118c32f64b37d4a28fe0c10e8d26927bc9bcc38e0d2cca2422b7b278baedc58",
+        "6923c703cf779c3b15047b785bbb11c565cf9fd8085076bac92b7d4c77d44e4e"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C29",
+      "class": "C_alias",
+      "q": "the core-count experiment percentage ambiguity",
+      "relevant": [
+        "8646ebf32d8d78930a7359d2de39933721451c3a95ea61825af4171d98c579ba",
+        "0fdc8d16699f674c1850502e65aacba6731de41c9a6dfa47a5599bdd1bba20a6",
+        "13d4a89ecb0b157e0bea3a681d576fecd6e594ede97cb8f5ea44e6230bc7ba2d"
+      ],
+      "v1": false
+    },
+    {
+      "id": "C30",
+      "class": "C_alias",
+      "q": "when a backend needs its own numerical contract",
+      "relevant": [
+        "6d1c0f618e53dd95b39a3a5a65b12bd92be9fc0244813574b0a8334a4ddd5dff",
+        "ba79ced4d2411ebd69ce4c7a0f9643c5eaa655eb7784ab540f92fcdb86bdb3f5"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D6",
+      "class": "D_conceptual",
+      "q": "what makes a measurement trustworthy rather than just recorded",
+      "relevant": [
+        "e58b3655b894d53e66bab99e301d249b56cfdfb7efbedfe0fe94ea5835230a8b",
+        "48e1aa1d1a4950ad9f7b3b76cac2e80df5dae49af6780626148c77b7ea5c9f63",
+        "5cec6ef3d2610fea5a0ec71cf76f1478f4ce81f5ddd8d5d5d8901fb31e24136a"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D7",
+      "class": "D_conceptual",
+      "q": "how do you know a test is actually testing anything",
+      "relevant": [
+        "5cec6ef3d2610fea5a0ec71cf76f1478f4ce81f5ddd8d5d5d8901fb31e24136a",
+        "c1a46b954ad3a51b836e9d9d65c2e8cd53805dea553942b4e4b0510349db3823",
+        "0aa35306693cf1dfa30b35280ecba010a37709fd048f8b539ff7beb6706bec73"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D8",
+      "class": "D_conceptual",
+      "q": "what did we get wrong about our own tools",
+      "relevant": [
+        "10b7adeaf43268c5f7468767f1f05301828aafc7c299302ae2b170d293f39ee4",
+        "741f980b34d13b3d8506b79b6e85a1cd359bb1d50f0885e115734fb1454cfc1e",
+        "3336e73cacdd64f057a5b0c3ffb0525dc48d054ea84f26c2d962667e7418ea00",
+        "6c6169ba3b1e2065bdd169fdee219c5748354f852538981a79525c9d9ec7ec7b"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D9",
+      "class": "D_conceptual",
+      "q": "when should a number be thrown away rather than adjusted",
+      "relevant": [
+        "5bc5a0fe8d53159bee23481899dac7df8d7a9174a3af2329a1c8aa50813e2c21"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D10",
+      "class": "D_conceptual",
+      "q": "what breaks when several things run at once",
+      "relevant": [
+        "19ce0b0712dd8d126df549456cbb274c0e0a6e89f1c83c8eccf519d5b31502a0",
+        "2b89321734562c4c42efc7a92ce57ad997f3a6360e46452a262de3036936061d",
+        "95a939c9be3e29a8fcc210f5fd8741e8021c47f229c8ba8281887d38a97a3d84"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D11",
+      "class": "D_conceptual",
+      "q": "how is data protected from being lost",
+      "relevant": [
+        "dabd424de5b9f489d6dad7c3bce56eb1d919027824099ea3298b9a20af98860b",
+        "a6602c8c99402f39b46d5f486a7b14e1ea1bb22cf5ca5d991d5ff26e86ed5b02"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D12",
+      "class": "D_conceptual",
+      "q": "what does it cost to be safe",
+      "relevant": [
+        "299cf8701fb58408c38ed094907f9cf1571126b2cddbcf578a396379f67a6585",
+        "a6602c8c99402f39b46d5f486a7b14e1ea1bb22cf5ca5d991d5ff26e86ed5b02",
+        "db516c071646cb94782a920043a69c5adf8765d0127bd91b8993056ad2f7ee34"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D13",
+      "class": "D_conceptual",
+      "q": "which assumptions turned out to be wrong",
+      "relevant": [
+        "ac048e767cd64776a1a5ed3e34fee71435f3ee0b936b8a3fd6d657c9dd79bfc3",
+        "19ce0b0712dd8d126df549456cbb274c0e0a6e89f1c83c8eccf519d5b31502a0",
+        "2f2e64ed5e5927ff077d31540706d7398321c20e629f24db0d5241cf327cded5"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D14",
+      "class": "D_conceptual",
+      "q": "how do you catch a problem before it bites",
+      "relevant": [
+        "5cec6ef3d2610fea5a0ec71cf76f1478f4ce81f5ddd8d5d5d8901fb31e24136a",
+        "5292089be1e885bfc8899e4038a0ac1d75b354f325262a626012faa17febdab1",
+        "0aa35306693cf1dfa30b35280ecba010a37709fd048f8b539ff7beb6706bec73"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D15",
+      "class": "D_conceptual",
+      "q": "what makes two systems interchangeable",
+      "relevant": [
+        "99d168fd462add2add6cc7be308427693b93275f6cf37d648f9192addbc69a3f",
+        "48e1aa1d1a4950ad9f7b3b76cac2e80df5dae49af6780626148c77b7ea5c9f63",
+        "7b8dc84bcb7daa2b246e5aac9419213254d46e8c99c0bf6ee55200c98c8c98d0"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D16",
+      "class": "D_conceptual",
+      "q": "why is one measurement not enough",
+      "relevant": [
+        "99d168fd462add2add6cc7be308427693b93275f6cf37d648f9192addbc69a3f",
+        "5292089be1e885bfc8899e4038a0ac1d75b354f325262a626012faa17febdab1"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D17",
+      "class": "D_conceptual",
+      "q": "what is the difference between a limit and a failure",
+      "relevant": [
+        "6d1c0f618e53dd95b39a3a5a65b12bd92be9fc0244813574b0a8334a4ddd5dff",
+        "ba79ced4d2411ebd69ce4c7a0f9643c5eaa655eb7784ab540f92fcdb86bdb3f5"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D18",
+      "class": "D_conceptual",
+      "q": "how does reuse change performance",
+      "relevant": [
+        "5b87b2a0fce65086de744e4aa54f950a1ea08ee26beb4dac854886f422c520bb",
+        "7b05039561a3732fc68bd7dbce869e44c46faad2e81788e07f8278e9be7364eb",
+        "a4c01ad4881298985e8420cf20b7580046e9e6f77c0b46d043b52018fd32b767"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D19",
+      "class": "D_conceptual",
+      "q": "what happens at the extremes of a setting",
+      "relevant": [
+        "57df45becb5bf85b5ad2dd30123dce95c8bede7d56d5623dcbbe38a8562f3430",
+        "8646ebf32d8d78930a7359d2de39933721451c3a95ea61825af4171d98c579ba",
+        "0fdc8d16699f674c1850502e65aacba6731de41c9a6dfa47a5599bdd1bba20a6"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D20",
+      "class": "D_conceptual",
+      "q": "when is agreement suspicious",
+      "relevant": [
+        "3336e73cacdd64f057a5b0c3ffb0525dc48d054ea84f26c2d962667e7418ea00",
+        "26aac552d73b9a6e27943dee4e0ebd376d915ac30e1d11a5b9b22fb9adfbedcc"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D21",
+      "class": "D_conceptual",
+      "q": "what does a score fail to tell you",
+      "relevant": [
+        "5cec6ef3d2610fea5a0ec71cf76f1478f4ce81f5ddd8d5d5d8901fb31e24136a",
+        "c1a46b954ad3a51b836e9d9d65c2e8cd53805dea553942b4e4b0510349db3823"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D22",
+      "class": "D_conceptual",
+      "q": "how do you decide between speed and safety",
+      "relevant": [
+        "a6602c8c99402f39b46d5f486a7b14e1ea1bb22cf5ca5d991d5ff26e86ed5b02",
+        "db516c071646cb94782a920043a69c5adf8765d0127bd91b8993056ad2f7ee34"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D23",
+      "class": "D_conceptual",
+      "q": "what should happen when something fails halfway",
+      "relevant": [
+        "2b89321734562c4c42efc7a92ce57ad997f3a6360e46452a262de3036936061d",
+        "5751782e0385163463d288a7dd3b2c8a05655e67a9ea0c689623c302bfb41c0f"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D24",
+      "class": "D_conceptual",
+      "q": "what did repeated runs reveal that a single run hid",
+      "relevant": [
+        "ac048e767cd64776a1a5ed3e34fee71435f3ee0b936b8a3fd6d657c9dd79bfc3",
+        "5292089be1e885bfc8899e4038a0ac1d75b354f325262a626012faa17febdab1"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D25",
+      "class": "D_conceptual",
+      "q": "where does a defect hide when everything looks fine",
+      "relevant": [
+        "3336e73cacdd64f057a5b0c3ffb0525dc48d054ea84f26c2d962667e7418ea00",
+        "6923c703cf779c3b15047b785bbb11c565cf9fd8085076bac92b7d4c77d44e4e",
+        "6c6169ba3b1e2065bdd169fdee219c5748354f852538981a79525c9d9ec7ec7b"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D26",
+      "class": "D_conceptual",
+      "q": "what limits the conclusions this corpus can support",
+      "relevant": [
+        "99d168fd462add2add6cc7be308427693b93275f6cf37d648f9192addbc69a3f",
+        "48e1aa1d1a4950ad9f7b3b76cac2e80df5dae49af6780626148c77b7ea5c9f63",
+        "c1a46b954ad3a51b836e9d9d65c2e8cd53805dea553942b4e4b0510349db3823"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D27",
+      "class": "D_conceptual",
+      "q": "why did a fix require measuring first",
+      "relevant": [
+        "19ce0b0712dd8d126df549456cbb274c0e0a6e89f1c83c8eccf519d5b31502a0",
+        "2f2e64ed5e5927ff077d31540706d7398321c20e629f24db0d5241cf327cded5"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D28",
+      "class": "D_conceptual",
+      "q": "what is the risk of choosing your own test cases",
+      "relevant": [
+        "5cec6ef3d2610fea5a0ec71cf76f1478f4ce81f5ddd8d5d5d8901fb31e24136a",
+        "64b4ee4c4c841544812caaec5c7861a45f9576137fde27cd7f0cd957bd297c6e"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D29",
+      "class": "D_conceptual",
+      "q": "how does the system behave under power loss",
+      "relevant": [
+        "a6602c8c99402f39b46d5f486a7b14e1ea1bb22cf5ca5d991d5ff26e86ed5b02"
+      ],
+      "v1": false
+    },
+    {
+      "id": "D30",
+      "class": "D_conceptual",
+      "q": "what evidence supports the current storage settings",
+      "relevant": [
+        "ae774c5abb2e2a606c3cf9ccc345791a132fb3c1d9a3fe048ad63e911051cce6",
+        "299cf8701fb58408c38ed094907f9cf1571126b2cddbcf578a396379f67a6585",
+        "bce1af6cbb611a2f99df50dac95b4dc087e76817d893ca1e393c3d73b6655c33",
+        "7d5538d8e3e511cea0e9e655e54b58e4ae0c1e187b1b39bb67e00e9db384ea52",
+        "a6602c8c99402f39b46d5f486a7b14e1ea1bb22cf5ca5d991d5ff26e86ed5b02"
+      ],
+      "v1": false
+    }
+  ]
+}

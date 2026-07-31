@@ -1,0 +1,115 @@
+# Entity dictionary, second tranche: the storage and instrumentation subjects
+# the M3 records introduced.
+#
+# WRITTEN BEFORE ANY v2 EVAL QUERY. That order matters and is the only thing
+# keeping this from being tuning: choosing which entities exist after seeing
+# which queries do badly would make the entity branch look good by construction.
+# The entities here are the things these records are *about*, chosen by reading
+# the records, not by reading a scoreboard.
+#
+# Aliases still share no wording with the canonical name where possible -- an
+# alias that restates the name adds nothing FTS5 does not already do better.
+#
+# A caveat this file cannot fix, stated here so it travels with the data: an
+# alias query is a query I wrote using an alias I also wrote. The C_alias class
+# therefore measures whether the branch works as designed, not whether it helps
+# on queries someone else would ask. See docs/acceptance/m2-retrieval-ablation.md.
+
+version = 1
+recorded_at = "2026-07-31T20:00:00Z"
+
+# --- storage engine --------------------------------------------------------
+
+[[entity]]
+name = "WAL"
+type = "storage-mode"
+aliases = ["write-ahead log", "the journal mode", "rollback-journal alternative"]
+
+[[entity]]
+name = "busy_timeout"
+type = "storage-setting"
+aliases = ["the busy handler", "lock wait", "how long a blocked writer waits"]
+
+[[entity]]
+name = "VACUUM INTO"
+type = "storage-operation"
+aliases = ["the snapshot command", "the backup primitive", "consistent copy"]
+
+[[entity]]
+name = "synchronous=FULL"
+type = "storage-setting"
+aliases = ["fsync on commit", "the durability pragma", "flush every transaction"]
+
+[[entity]]
+name = "BEGIN IMMEDIATE"
+type = "storage-operation"
+aliases = ["the eager transaction", "taking the lock up front", "non-deferred begin"]
+
+[[entity]]
+name = "SQLite"
+type = "storage-engine"
+aliases = ["the embedded database", "the single-file store", "no daemon, no port"]
+
+[[entity]]
+name = "rusqlite"
+type = "library"
+aliases = ["the Rust binding", "the database crate"]
+
+[[entity]]
+name = "schema migration"
+type = "storage-operation"
+aliases = ["forward-only versioning", "the DDL runner", "bringing the schema up to date"]
+
+# --- retrieval -------------------------------------------------------------
+
+[[entity]]
+name = "FTS5"
+type = "retrieval-branch"
+aliases = ["the lexical branch", "full-text search", "bm25 ranking"]
+
+[[entity]]
+name = "prompt prefix cache"
+type = "inference-feature"
+aliases = ["cache_prompt", "prefix reuse", "the Gate 0 experiment"]
+
+# --- instrumentation -------------------------------------------------------
+
+[[entity]]
+name = "systematic mutation"
+type = "test-method"
+aliases = ["the mutant generator", "kill rate", "every mutant an operator set can produce"]
+
+[[entity]]
+name = "hand-picked mutants"
+type = "test-method"
+aliases = ["the four chosen mutants", "defects the author anticipated"]
+
+[[entity]]
+name = "checker fixtures"
+type = "test-artifact"
+aliases = ["known-pass known-fail", "the both-polarity pairs", "the quality gate"]
+
+[[entity]]
+name = "sentence splitter"
+type = "code-unit"
+aliases = ["the boundary detector", "the abbreviation bug"]
+
+[[entity]]
+name = "logit divergence"
+type = "measurement"
+aliases = ["numerical drift", "how far the backends disagree", "the conformance delta"]
+
+[[entity]]
+name = "thread sweep"
+type = "experiment"
+aliases = ["the core-count experiment", "scaling across worker counts"]
+
+[[entity]]
+name = "MCP"
+type = "protocol"
+aliases = ["the agent surface", "the tool protocol", "what a model can reach"]
+
+[[entity]]
+name = "operator channel"
+type = "protocol"
+aliases = ["out of band", "the door no agent can open", "the CLI-only path"]

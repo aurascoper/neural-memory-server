@@ -228,25 +228,108 @@ it failed:
 Rubrics in `corpus/*.json` are pre-registered before the corresponding importer
 exists, and are void if edited after a grading run.
 
+## Operations
+
+### Backup
+
+```
+neural-memory-admin backup --db ~/.local/share/neural-memory/store.db \
+                           --to  /path/to/backup-2026-07-31.db
+```
+
+Uses `VACUUM INTO`, and **not** `cp`. In WAL mode a committed transaction lives
+in `store.db-wal` until a checkpoint, so copying `store.db` alone can omit
+history that is fully committed — and the copy still opens and still passes
+`integrity_check`, so the loss is silent. `tests/backup.rs` demonstrates this
+rather than asserting it: a bare file copy taken with commits still in the WAL
+comes back short, and the `VACUUM INTO` snapshot does not.
+
+Verification runs by default and **its failure is the command's failure**. It
+opens the copy read-only and compares content — every record digest, every
+observation identity, every provenance edge, plus row counts on the remaining
+tables and `integrity_check` on the replica. A backup check that only confirms
+the file exists is the same class of error as a fixture that only asserts the
+pass side, so the verifier is tested against a deleted record, an altered claim,
+a dropped edge and a dropped observation. `--no-verify` exists and is a bad idea.
+
+Re-verify an older copy without taking a new one:
+
+```
+neural-memory-admin verify-backup --db <live> --of <backup>
+```
+
+Backup refuses to overwrite an existing destination: replacing the previous
+backup destroys the only copy that predates whatever prompted this one. A failed
+verification leaves the bad copy in place for inspection.
+
+**What this does not do.** A backup on the same disk is a copy, not redundancy.
+It restores from a mistaken write or a corrupted page; it does not survive the
+drive. `VACUUM INTO` holds a read transaction for its duration — 3.5 ms on this
+store, which is why concurrent sessions do not notice, and which is worth
+re-measuring rather than assuming if the corpus grows by orders of magnitude.
+
+### Durability
+
+The store runs at `synchronous=FULL`, not the usual WAL-mode `NORMAL`. Under
+`NORMAL`, WAL does not fsync at commit: a transaction that returned success can
+be lost to **power loss or an OS crash**. A process crash is safe either way.
+For an append-only evidence store, losing the last committed records is not a
+performance trade-off, it is the store failing at the one thing it claims to do
+— and this runs on a handheld, on battery, that suspends.
+
+Measured with `neural-memory-bench-durability` before choosing (ext4 on NVMe,
+median of 5 rounds):
+
+| shape | NORMAL | FULL | cost |
+|---|---|---|---|
+| `singleCommit` — one claim, one transaction (what `remember` does) | 66.9 µs | 941.6 µs | 14.1× |
+| `batchedIngest` — a document in one transaction (what an operator does) | 19.1 µs | 23.7 µs | 1.2× |
+
+The 14× is the wrong figure to decide on. What matters is that one `remember`
+goes from 0.07 ms to 0.94 ms inside an MCP round trip measured in seconds, and
+that bulk loading already goes through batched ingest, which pays 1.2× because
+one fsync amortises across the whole document. The shape 14× would punish — tens
+of thousands of individual commits — is not a shape this store has.
+
+`tests/concurrency.rs` asserts `PRAGMA synchronous` is 2, so a later "small"
+pragma change cannot quietly trade committed history for write latency.
+
 ## Known limits
 
-- **Retrieval branches are measured, on a small set.** Both semantic and entity
-  pass their pre-registered conditions — semantic +0.087 MRR on paraphrase and
-  conceptual queries at zero cost to verbatim, entity +0.333 on alias queries
-  and +0.233 even given semantic. But **n = 5 per class**, so one query moving
-  one rank shifts a class mean by 0.10 and the headline gain is about one
-  query's worth of movement. Direction is consistent; magnitudes are not robust.
-  See [m2-retrieval-ablation.md](docs/acceptance/m2-retrieval-ablation.md).
+- **The semantic branch did not replicate.** At n = 5 it gained +0.087 MRR on
+  paraphrase and conceptual queries. Re-run at **n = 30 per class** it gains
+  +0.058 against a +0.050 threshold — clearing it by 0.008, which is a hair, not
+  a result. Re-run on the *identical 20 original queries* against the current,
+  larger store it gains **+0.038 and fails**. The entity branch did replicate:
+  +0.190 on alias queries, +0.178 even given semantic.
+  See [m3-retrieval-replication.md](docs/acceptance/m3-retrieval-replication.md).
+- **The eval corpus is still written by the author of the branches.** Expanding
+  it from 20 queries to 120 fixed n, which was the smaller of the two limits. It
+  did not fix the larger one: 120 queries written in one sitting sample one
+  person's idea of a paraphrase six times instead of once.
+- **Retrieval evidence has a confound this run cannot resolve.** Between the two
+  ablations the store grew 75 → 92 records *and* embedding coverage went 26
+  records → all of them. Both plausibly explain the semantic weakening and they
+  changed together. Under partial coverage the semantic arm was effectively
+  searching a third of the corpus while the lexical arm searched all of it.
 - **Transaction time is unknown for early records.** Everything written before
   migration 0003 has an ordering (`recorded_seq`) but no `recorded_at` instant,
   so `as_of` on a date in that range reports `unknownBefore` rather than
   guessing. Permanent for those rows — backfilling `occurred_at` into it would
   conflate the two axes the split exists to separate.
-- **Concurrency is untested.** One SQLite file, WAL mode, multiple clients.
-- **No backup procedure.** Backup is copying the file; that is not the same as
-  having tested a restore.
-- **The corpus is small** — tens of claims, drawn from one characterization
-  document. Absence from the store is not evidence of absence in the world.
+- **Concurrency is measured, and it found two real defects.** Eight processes
+  opening a fresh store: `PRAGMA journal_mode=WAL` returned `SQLITE_BUSY`
+  immediately on three of them — it takes a brief exclusive lock and does *not*
+  invoke the busy handler, so `busy_timeout` never applied. Separately, the
+  migration runner checked whether a migration was applied outside the
+  transaction that applies it, and used a `DEFERRED` transaction, so two
+  processes could both pass the check and both run the same DDL. Both are fixed;
+  the suites run clean 25 times consecutively. Neither was the defect the plan
+  predicted — `busy_timeout` was already correct.
+  Note that the second bug **passed a first clean run** and only appeared on the
+  second. A concurrency test that passes once has demonstrated nothing.
+- **The corpus is small** — around a hundred claims. Absence from the store is
+  not evidence of absence in the world.
 - **`submit_answer`'s rejection path has never fired against a live model.**
   Seven tests cover it; zero runs do.
 

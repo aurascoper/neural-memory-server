@@ -1,5 +1,12 @@
 # M2 acceptance — does the semantic branch actually help? (2026-07-31)
 
+> **Superseded in part.** `m3-retrieval-replication.md` re-ran this ablation at
+> n = 30 per class, and re-ran the *identical 20 queries below* against a larger
+> store with full embedding coverage. **The entity result replicated; the
+> semantic result did not** — the same 20 queries now give +0.038 against the
+> +0.050 threshold. Nothing below is edited: it records what was measured on the
+> data available then, which is what an acceptance document is for.
+
 Graded against `corpus/retrieval-eval.json`: 20 queries, relevance labels,
 metric and pass conditions all fixed **before** any ablation ran.
 

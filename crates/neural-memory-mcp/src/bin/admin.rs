@@ -14,6 +14,8 @@
 //!   record-decision   --db P --claim C [--locator L] --at T
 //!   supersede         --db P --retired H --replacement H --at T
 //!   stats             --db P
+//!   backup            --db P --to B [--no-verify]
+//!   verify-backup     --db P --of B
 
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -32,7 +34,10 @@ fn main() -> ExitCode {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     if argv.is_empty() {
         eprintln!("usage: neural-memory-admin <command> --db <path> [options]");
-        eprintln!("commands: record-artifact record-observation record-decision supersede stats");
+        eprintln!(
+            "commands: record-artifact record-observation record-decision supersede stats \
+             backup verify-backup"
+        );
         return ExitCode::from(2);
     }
     let cmd = argv[0].clone();
@@ -210,6 +215,81 @@ fn run(cmd: &str, m: &HashMap<String, String>) -> Result<String, String> {
                 store.max_recorded_seq().map_err(|e| e.to_string())?,
                 store.integrity_ok().map_err(|e| e.to_string())?
             ))
+        }
+
+        // `VACUUM INTO`, not `cp`. In WAL mode a committed transaction lives in
+        // `store.db-wal` until a checkpoint, so copying `store.db` alone can
+        // omit history that is fully committed — and the copy still opens and
+        // still passes `integrity_check`, so the loss is silent.
+        //
+        // Verification runs by default and its failure is the command's failure.
+        // A backup nobody checked is a guess about a file.
+        "backup" => {
+            let to = PathBuf::from(arg(m, "to")?);
+            let report = store.backup_to(&to).map_err(|e| e.to_string())?;
+
+            if m.contains_key("no-verify") {
+                return Ok(format!(
+                    "backed up to {} ({} bytes, {} records, {} observations, {} edges, schema {}) \
+                     -- NOT VERIFIED (--no-verify)",
+                    report.destination,
+                    report.bytes,
+                    report.records,
+                    report.observations,
+                    report.edges,
+                    report.schema_version
+                ));
+            }
+
+            let diffs = verify_replica(&store, &to).map_err(|e| e.to_string())?;
+            if !diffs.is_empty() {
+                // Leave the bad copy in place. Deleting the evidence of a failed
+                // backup is how the same failure happens again unexplained.
+                return Err(format!(
+                    "backup wrote {} but verification found {} difference(s); \
+                     the file has been left in place for inspection:\n  {}",
+                    to.display(),
+                    diffs.len(),
+                    diffs
+                        .iter()
+                        .take(10)
+                        .map(|d| d.to_string())
+                        .collect::<Vec<_>>()
+                        .join("\n  ")
+                ));
+            }
+            Ok(format!(
+                "backed up to {} ({} bytes, {} records, {} observations, {} edges, schema {}) \
+                 -- verified: every record digest, observation identity and provenance edge matches",
+                report.destination,
+                report.bytes,
+                report.records,
+                report.observations,
+                report.edges,
+                report.schema_version
+            ))
+        }
+
+        // Verify a backup taken earlier, without taking a new one.
+        "verify-backup" => {
+            let of = PathBuf::from(arg(m, "of")?);
+            let diffs = verify_replica(&store, &of).map_err(|e| e.to_string())?;
+            if diffs.is_empty() {
+                Ok(format!("{} matches {} exactly", of.display(), db.display()))
+            } else {
+                Err(format!(
+                    "{} differs from {} in {} way(s):\n  {}",
+                    of.display(),
+                    db.display(),
+                    diffs.len(),
+                    diffs
+                        .iter()
+                        .take(20)
+                        .map(|d| d.to_string())
+                        .collect::<Vec<_>>()
+                        .join("\n  ")
+                ))
+            }
         }
 
         other => Err(format!("unknown command: {other}")),
