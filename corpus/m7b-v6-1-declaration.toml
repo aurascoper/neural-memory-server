@@ -1,0 +1,266 @@
+# M7-B v6-1: declaration, Rust-owned corpus, exact arithmetic.
+#
+# NeuralCompose issue #7, implemented on branch
+# m7-b/local-qwen-generation-benchmark from head ff65d9d5, committed a3a8382.
+#
+# Hand-written. Every figure below is transcribed from a real run; the artifact
+# digests pin exactly which source produced it, so editing that source stops
+# this attestation from applying to it.
+#
+# What makes the three defects `external` rather than `observed`: the pre-fix
+# source no longer exists, so there is no artifact left to attest them against.
+# Recording them as observations would claim evidence that has been replaced --
+# the same reason the Track A checker bugs are external.
+
+version = 1
+run_id = "m7b-v6-1-declaration"
+recorded_at = "2026-07-31T22:15:00Z"
+
+[[artifact]]
+id = "module"
+kind = "source"
+sha256 = "b6595e915e4a0f98b006ddb064223a2508c91f97698cd1371f468a5190d53937"
+bytes = 102728
+media_type = "text/x-rust"
+uri = "file:///crates/neuralcompose-mobile-core/src/generation_eval.rs"
+
+[[artifact]]
+id = "suite"
+kind = "test-source"
+sha256 = "3f12dbd2336db995db7c94b7c3fbebc2c5dca0c29c1bc24f8a0c580425b8bbc2"
+bytes = 65064
+media_type = "text/x-rust"
+uri = "file:///crates/neuralcompose-mobile-core/tests/m7b_eval_protocol.rs"
+
+[[artifact]]
+id = "corpus"
+kind = "eval-corpus"
+sha256 = "10e140bb04c51208c480113b1abba27d1dfb80f380e5072e641d11fc0f355b70"
+bytes = 7645
+media_type = "application/json"
+uri = "file:///contracts/generation-eval/m7b-corpus-v1.json"
+
+[[policy]]
+id = "gates"
+metric = "passingTests"
+aggregation = "countOfTests"
+comparison_rule = "mustAllPass"
+unit = "test"
+
+[[suite]]
+id = "m7b"
+name = "m7b-eval-protocol-v6"
+case_texts = [
+  "a_corpus_that_misses_or_overshoots_its_quota_is_rejected",
+  "a_task_context_pair_outside_the_allowed_matrix_is_rejected",
+  "the_context_profile_alone_changes_the_semantic_prompt_identity",
+  "each_evaluator_policy_identity_is_part_of_the_declaration_digest",
+  "an_exact_margin_comparison_has_no_epsilon_drift",
+  "selection_coverage_is_enforced_against_the_corpus_and_the_run_plan",
+  "a_ledger_mixing_scorer_identities_is_rejected",
+  "no_public_api_accepts_a_corpus_digest_alongside_corpus_content",
+]
+tokenizer = "none"
+context_cap = 1
+
+[[observation]]
+id = "o_workspace"
+kind = "passingTests.workspace"
+quantity = "absolute"
+value = "164"
+policy = "gates"
+suite = "m7b"
+runtime = "rustc-1.97.1-x86_64-unknown-linux-gnu"
+artifact = "suite"
+
+[[observation]]
+id = "o_module"
+kind = "passingTests.m7bModule"
+quantity = "absolute"
+value = "28"
+policy = "gates"
+suite = "m7b"
+runtime = "rustc-1.97.1-x86_64-unknown-linux-gnu"
+artifact = "suite"
+
+[[observation]]
+id = "o_prompts"
+kind = "corpusPrompts.frozen"
+quantity = "absolute"
+value = "18"
+policy = "gates"
+suite = "m7b"
+runtime = "rustc-1.97.1-x86_64-unknown-linux-gnu"
+artifact = "corpus"
+
+# ---------------------------------------------------------------------------
+# Starting state and authorization
+# ---------------------------------------------------------------------------
+
+[[claim]]
+id = "c_start"
+text = "The local clone of neuralcompose-client-native was cloned --single-branch and had never fetched the M7-B branch, so the working tree sat on main at dabf688 and ff65d9d5 did not exist locally; the branch was fetched explicitly and checked out at exactly ff65d9d557de60ae16abe936542c2aa5c21f3b1d with a clean tree"
+evidence = "external"
+locator = "M7-B preflight"
+
+[[claim]]
+id = "c_authz"
+text = "Issue #7 alone was authorized for implementation; #8, #9 and #10 remain contract definitions whose filing authorized no branch or code change, and the required order is 7 then 8 then 9 then 10 then Pixel preflight"
+evidence = "decision"
+locator = "M7-B authorization"
+
+# ---------------------------------------------------------------------------
+# The three defects, as they were before the fix
+# ---------------------------------------------------------------------------
+
+[[claim]]
+id = "c_bug_corpus"
+text = "The frozen corpus did not exist: git ls-files at ff65d9d5 returned no corpus, prompt or rubric artifact, corpus_id and corpus_sha256_hex were validated only for non-emptiness, and the only values they ever held were the test fixtures m7b-sanitized-v1 and sha(0xa1), so the digest the protocol claimed to bind was an unbacked caller assertion"
+evidence = "external"
+locator = "issue #7 finding 5"
+
+[[claim]]
+id = "c_bug_coverage"
+text = "Quality-plan coverage was declared but not enforced: run_plan and quality_plan were validated for non-emptiness and candidate consistency only, so a plan could score one prompt twice and another never while the frozen equal-prompt macro rule averaged a set nobody declared"
+evidence = "external"
+locator = "issue #7 finding 1"
+
+[[claim]]
+id = "c_bug_float"
+text = "The ten quality axes and material_quality_margin were f64, and the two-stage average of ten all-0.8 axes observes 0.8000000000000002, which is harmless for display and decisive when compared against an exact material margin"
+evidence = "external"
+locator = "issue #7 finding 4"
+
+# ---------------------------------------------------------------------------
+# What now holds
+# ---------------------------------------------------------------------------
+
+[[claim]]
+id = "c_corpus_owned"
+text = "The corpus is a committed artifact that Rust include_bytes! compiles in and whose identity is derived from its content by domain-tagged hash; corpus_id, corpus_sha256_hex and the caller-supplied expected_prompts list are all removed, so there is no API path that pairs arbitrary corpus content with an asserted digest"
+evidence = "observed"
+artifact = "module"
+locator = "crates/neuralcompose-mobile-core/src/generation_eval.rs"
+observations = ["o_prompts"]
+
+[[claim]]
+id = "c_fixture_gate"
+text = "check-fixtures.sh re-serializes the parsed corpus value canonically and diffs it against the same committed file, so the compiled bytes and the reviewable artifact are proven to agree rather than assumed to; the hand-authored file was byte-identical to the canonical form on first run"
+evidence = "observed"
+artifact = "corpus"
+locator = "scripts/check-fixtures.sh"
+
+[[claim]]
+id = "c_exact"
+text = "Quality axes are integer millionths and aggregation carries an exact rational, so a ledger of all-0.8 axes derives back to exactly 800000/1 and a margin of exactly 0.1 against a material margin of exactly 0.1 promotes rather than splitting"
+evidence = "observed"
+artifact = "suite"
+locator = "tests/m7b_eval_protocol.rs"
+observations = ["o_module"]
+
+[[claim]]
+id = "c_selection"
+text = "The required selection coverage is derived from the corpus and the frozen seeds and compared against the quality plan, with each entry cross-referenced against the unique matching warm run-plan slot, so a doubled slot and the prompt it was stolen from are both named"
+evidence = "observed"
+artifact = "module"
+locator = "crates/neuralcompose-mobile-core/src/generation_eval.rs"
+
+[[claim]]
+id = "c_scorer"
+text = "Each scored mark is compared against the scorer identity the declaration names rather than against its neighbours, so a ledger scored end to end by an undeclared panel is rejected for being undeclared and not merely for being inconsistent"
+evidence = "observed"
+artifact = "module"
+locator = "crates/neuralcompose-mobile-core/src/generation_eval.rs"
+
+[[claim]]
+id = "c_gates"
+text = "All eight CI gates passed on the committed tree at a3a8382 and the tree stayed clean afterwards, which is what shows the two regeneration gates are idempotent rather than merely satisfied once"
+evidence = "observed"
+artifact = "suite"
+locator = "M7-B CI sequence"
+observations = ["o_workspace"]
+
+# ---------------------------------------------------------------------------
+# Decisions taken, and what was deliberately not decided
+# ---------------------------------------------------------------------------
+
+[[claim]]
+id = "c_quota_weighting"
+text = "The corpus quota is two prompts per allowed pair, and equal counts per PAIR gives InstructionRendering a third of the macro weight because it appears under three contexts; this is deliberate and stated in the code rather than left to emerge, since quota shape is the weighting"
+evidence = "decision"
+locator = "crates/neuralcompose-mobile-core/src/generation_eval.rs"
+
+[[claim]]
+id = "c_export_corpus"
+text = "frozen_corpus_v1 and the frozen policy values are exported over UniFFI because without them no shell could obtain the corpus and therefore could not build a valid declaration at all; the direction is what matters, since these hand the corpus out and never take one in"
+evidence = "decision"
+locator = "crates/neuralcompose-mobile-core/src/generation_eval.rs"
+
+[[claim]]
+id = "c_surface_check_honest"
+text = "The no-corpus-digest regression is a source-surface scan plus a serialized-shape assertion, and it says so: it proves no public signature or field in the module names a corpus digest, not that the property is impossible to reintroduce under a different spelling"
+evidence = "decision"
+locator = "tests/m7b_eval_protocol.rs"
+
+[[claim]]
+id = "c_multiscorer_deferred"
+text = "Multi-scorer semantics were deferred rather than guessed, because they need settled answers on coverage, missing raters, weighting, aggregation order, disagreement, replacement and recusal, and whether inter-rater reliability is descriptive or promotion-critical, and no study here requires any of them yet"
+evidence = "decision"
+locator = "issue #7 finding 3"
+
+[[claim]]
+id = "c_swift_unverified"
+text = "The iOS smoke test was updated to the v6 surface against the regenerated Swift binding but was not compiled, because this host has no Swift toolchain and the repository CI does not build or run the Swift tests either; it is the one part of this change that rests on reading rather than on execution"
+evidence = "external"
+locator = "ios/NeuralComposeCore/Tests/SmokeTests.swift"
+
+[[claim]]
+id = "c_not_started"
+text = "Issues #8, #9 and #10 were not begun; manifests binding the five evaluator-policy identities are #8's job by the issue's own dependency note, and the verdict carries them here only because evaluate_promotion already had the declaration in scope"
+evidence = "decision"
+locator = "M7-B authorization"
+
+[[edge]]
+from = "c_corpus_owned"
+to = "c_bug_corpus"
+kind = "refutes"
+
+[[edge]]
+from = "c_selection"
+to = "c_bug_coverage"
+kind = "refutes"
+
+[[edge]]
+from = "c_exact"
+to = "c_bug_float"
+kind = "refutes"
+
+[[edge]]
+from = "c_fixture_gate"
+to = "c_corpus_owned"
+kind = "supports"
+
+[[edge]]
+from = "c_quota_weighting"
+to = "c_corpus_owned"
+kind = "derivedFrom"
+
+[[edge]]
+from = "c_export_corpus"
+to = "c_corpus_owned"
+kind = "derivedFrom"
+
+[[edge]]
+from = "c_surface_check_honest"
+to = "c_corpus_owned"
+kind = "supports"
+
+[[edge]]
+from = "c_swift_unverified"
+to = "c_gates"
+kind = "contradicts"
+
+[[edge]]
+from = "c_start"
+to = "c_authz"
+kind = "supports"
