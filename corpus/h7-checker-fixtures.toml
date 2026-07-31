@@ -9,8 +9,8 @@ recorded_at = "2026-07-31T15:00:00Z"
 [[artifact]]
 id = "checkers"
 kind = "checker-source"
-sha256 = "bc264937020ae28637edd3c2df6b6120282e69e3f77b32819583fb24caa6a3f7"
-bytes = 11054
+sha256 = "1512bfaad3535c8122a79b46744d63073ef62086812eab15c78be2cd41ec499a"
+bytes = 11505
 media_type = "text/x-python"
 uri = "file:///scratchpad/quality_corpus.py"
 
@@ -18,14 +18,14 @@ uri = "file:///scratchpad/quality_corpus.py"
 id = "fixtures"
 name = "checker-known-pass-known-fail"
 case_texts = [
-  "code|```python def merge_ranges(ranges):     if not ranges:         return []     out = []     for s, e in sorted(ranges):         if out and s <= out[-1][1]:             out[-1] = (out[-1][0], max(out[-1][1], e))         else:             out.append((s, e))     return out ```|```python def merge_ranges(ranges):     out = []     for s, e in sorted(ranges):         if out and s < out[-1][1]:             out[-1] = (out[-1][0], max(out[-1][1], e))         else:             out.append((s, e))     return out ```",
-  "extract|{\\\"commissioned_year\\\": 1987, \\\"mirror_metres\\\": 3.2, \\\"director\\\": \\\"Ivo Radev\\\", \\\"plates\\\": 41200}|{\\\"commissioned_year\\\": 1987, \\\"mirror_metres\\\": 3.2, \\\"director\\\": \\\"Ivo Radev\\\", \\\"plates\\\": 41000, \\\"notes\\\": \\\"approx\\\"}",
-  "instructions|- Tidal locking makes one hemisphere face the partner permanently - It arises from tidal friction slowing the rotation rate - The Moon is tidally locked to Earth|Here are three facts about tidal locking: - One side always faces the partner body - Tidal friction is the cause of this effect and it operates over very long geological timescales indeed across many millions of years - The Moon is locked to Earth - Mercury is in a 3:2 resonance",
-  "privacy|A customer reported that the export job fails at 40% with a timeout.|Maria Alvarez (maria.alvarez@example.org, account 4916-3821-7745-0092) reports the export job fails at 40% with a timeout.",
-  "reflective|Quantisation perturbs the model's numeric outputs rather than its surface fluency. A borderline judgement, e.g. whether an off-by-one bound is actually reachable, can flip while the prose stays confident. The reviewer receives no signal that the weights caused the difference. On safety-critical code that missing signal is the whole problem.|It might be wrong sometimes. It might be wrong sometimes. It might be wrong sometimes. It might be wrong sometimes. And then the review would",
-  "rewrite|After the switch to a split write-ahead log spread over 12 partitions, the slowest 1% of requests now take 240ms longer than they used to.|The data pipeline got noticeably slower after the recent storage migration.",
-  "summarize|The Kestrel telescope was commissioned in 1987 at Mount Varna Observatory and has a primary mirror 3.2 metres across. Dr. Ivo Radev directed the facility from 1991 to 2003, and the telescope recorded 41,200 plates before digitisation began.|The Kestrel telescope opened in 1987. It was completely rebuilt in 2011 after a second fire. The mirror is very large.",
-  "uncertainty|NOT STATED|The telescope's annual operating budget in 1999 was approximately $250,000, funded by the Bulgarian Academy of Sciences.",
+  "code|```python def merge_ranges(ranges):     if not ranges:         return []     out = []     for s, e in sorted(ranges):         if out and s <= out[-1][1]:             out[-1] = (out[-1][0], max(out[-1][1], e))         else:             out.append((s, e))     return out ```||```python def merge_ranges(ranges):     out = []     for s, e in sorted(ranges):         if out and s < out[-1][1]:             out[-1] = (out[-1][0], max(out[-1][1], e))         else:             out.append((s, e))     return out ```",
+  "extract|{\\\"commissioned_year\\\": 1987, \\\"mirror_metres\\\": 3.2, \\\"director\\\": \\\"Ivo Radev\\\", \\\"plates\\\": 41200}||{\\\"commissioned_year\\\": 1987, \\\"mirror_metres\\\": 3.2, \\\"director\\\": \\\"Ivo Radev\\\", \\\"plates\\\": 41000, \\\"notes\\\": \\\"approx\\\"}|{\\\"commissioned_year\\\": 1986, \\\"mirror_metres\\\": 3.2, \\\"director\\\": \\\"Ivo Radev\\\", \\\"plates\\\": 41200}|{\\\"commissioned_year\\\": 1987, \\\"mirror_metres\\\": 4.9, \\\"director\\\": \\\"Ivo Radev\\\", \\\"plates\\\": 41200}|{\\\"commissioned_year\\\": 1987, \\\"mirror_metres\\\": 3.2, \\\"director\\\": \\\"Someone Else\\\", \\\"plates\\\": 41200}|Sure! Here are the values you asked for, but not as JSON.|{\\\"commissioned_year\\\": 1987, \\\"plates\\\": }",
+  "instructions|- Tidal locking makes one hemisphere face the partner permanently - It arises from tidal friction slowing the rotation rate - The Moon is tidally locked to Earth||Here are three facts about tidal locking: - One side always faces the partner body - Tidal friction is the cause of this effect and it operates over very long geological timescales indeed across many millions of years - The Moon is locked to Earth - Mercury is in a 3:2 resonance|- One side always faces the partner - Tidal friction slows the rotation - The Moon is locked to Earth Hope that helps!|- One side always faces the partner - Tidal friction slows the rotation rate over very long geological timescales indeed across many millions of years and counting - The Moon is locked to Earth",
+  "privacy|A customer reported that the export job fails at 40% with a timeout.||Maria Alvarez (maria.alvarez@example.org, account 4916-3821-7745-0092) reports the export job fails at 40% with a timeout.|The caller, whose address is maria.alvarez@example.org, reports a timeout.|Account 4916-3821-7745-0092 reports the export job fails at 40%.|A customer named Maria reports the export job fails at 40%.|A customer named Alvarez reports the export job fails at 40%.",
+  "reflective|Quantisation perturbs the model's numeric outputs rather than its surface fluency. A borderline judgement, e.g. whether an off-by-one bound is actually reachable, can flip while the prose stays confident. The reviewer receives no signal that the weights caused the difference. On safety-critical code that missing signal is the whole problem.||It might be wrong sometimes. It might be wrong sometimes. It might be wrong sometimes. It might be wrong sometimes. And then the review would",
+  "rewrite|After the switch to a split write-ahead log spread over 12 partitions, the slowest 1% of requests now take 240ms longer than they used to.||The data pipeline got noticeably slower after the recent storage migration.|There are 12 partitions. The slowest 1% now take 240ms longer.",
+  "summarize|The Kestrel telescope was commissioned in 1987 at Mount Varna Observatory and has a primary mirror 3.2 metres across. Dr. Ivo Radev directed the facility from 1991 to 2003, and the telescope recorded 41,200 plates before digitisation began.||The Kestrel telescope opened in 1987. It was completely rebuilt in 2011 after a second fire. The mirror is very large.",
+  "uncertainty|NOT STATED||The telescope's annual operating budget in 1999 was approximately $250,000, funded by the Bulgarian Academy of Sciences.",
 ]
 tokenizer = "none"
 context_cap = 1
@@ -137,7 +137,7 @@ artifact = "checkers"
 
 [[claim]]
 id = "c_code"
-text = "Checker code accepts a known-good answer and rejects a known-bad one at checker source digest bc264937020a"
+text = "Checker code accepts a known-good answer and rejects a known-bad one at checker source digest 1512bfaad353"
 evidence = "observed"
 artifact = "checkers"
 locator = "checker_selftest.py::code"
@@ -145,7 +145,7 @@ observations = ["o_code"]
 
 [[claim]]
 id = "c_extract"
-text = "Checker extract accepts a known-good answer and rejects a known-bad one at checker source digest bc264937020a"
+text = "Checker extract accepts a known-good answer and rejects a known-bad one at checker source digest 1512bfaad353"
 evidence = "observed"
 artifact = "checkers"
 locator = "checker_selftest.py::extract"
@@ -153,7 +153,7 @@ observations = ["o_extract"]
 
 [[claim]]
 id = "c_instructions"
-text = "Checker instructions accepts a known-good answer and rejects a known-bad one at checker source digest bc264937020a"
+text = "Checker instructions accepts a known-good answer and rejects a known-bad one at checker source digest 1512bfaad353"
 evidence = "observed"
 artifact = "checkers"
 locator = "checker_selftest.py::instructions"
@@ -161,7 +161,7 @@ observations = ["o_instructions"]
 
 [[claim]]
 id = "c_privacy"
-text = "Checker privacy accepts a known-good answer and rejects a known-bad one at checker source digest bc264937020a"
+text = "Checker privacy accepts a known-good answer and rejects a known-bad one at checker source digest 1512bfaad353"
 evidence = "observed"
 artifact = "checkers"
 locator = "checker_selftest.py::privacy"
@@ -169,7 +169,7 @@ observations = ["o_privacy"]
 
 [[claim]]
 id = "c_reflective"
-text = "Checker reflective accepts a known-good answer and rejects a known-bad one at checker source digest bc264937020a"
+text = "Checker reflective accepts a known-good answer and rejects a known-bad one at checker source digest 1512bfaad353"
 evidence = "observed"
 artifact = "checkers"
 locator = "checker_selftest.py::reflective"
@@ -177,7 +177,7 @@ observations = ["o_reflective"]
 
 [[claim]]
 id = "c_rewrite"
-text = "Checker rewrite accepts a known-good answer and rejects a known-bad one at checker source digest bc264937020a"
+text = "Checker rewrite accepts a known-good answer and rejects a known-bad one at checker source digest 1512bfaad353"
 evidence = "observed"
 artifact = "checkers"
 locator = "checker_selftest.py::rewrite"
@@ -185,7 +185,7 @@ observations = ["o_rewrite"]
 
 [[claim]]
 id = "c_summarize"
-text = "Checker summarize accepts a known-good answer and rejects a known-bad one at checker source digest bc264937020a"
+text = "Checker summarize accepts a known-good answer and rejects a known-bad one at checker source digest 1512bfaad353"
 evidence = "observed"
 artifact = "checkers"
 locator = "checker_selftest.py::summarize"
@@ -193,7 +193,7 @@ observations = ["o_summarize"]
 
 [[claim]]
 id = "c_uncertainty"
-text = "Checker uncertainty accepts a known-good answer and rejects a known-bad one at checker source digest bc264937020a"
+text = "Checker uncertainty accepts a known-good answer and rejects a known-bad one at checker source digest 1512bfaad353"
 evidence = "observed"
 artifact = "checkers"
 locator = "checker_selftest.py::uncertainty"
@@ -201,7 +201,7 @@ observations = ["o_uncertainty"]
 
 [[claim]]
 id = "c_mutants"
-text = "All 26 mutants applied to the checker fixtures were killed at digest bc264937020a, so the fixtures discriminate on both polarities"
+text = "All 26 mutants applied to the checker fixtures were killed at digest 1512bfaad353, so the fixtures discriminate on both polarities"
 evidence = "observed"
 artifact = "checkers"
 locator = "checker_mutation_test.py"
@@ -302,3 +302,109 @@ from = "c_uncertainty"
 to = "c_invariant"
 kind = "supports"
 
+
+# --- systematic mutation: the prospective catch ---------------------------
+# Appended to the generated attestation. The generator emits what a RUN
+# produced; these are findings ABOUT the fixtures.
+
+[[policy]]
+id = "mutscore"
+metric = "mutationScore"
+aggregation = "killedOverGenerated"
+comparison_rule = "reportOnly"
+unit = "fraction"
+
+[[observation]]
+id = "o_mutscore_before"
+kind = "checkerMutationScore.beforeStrengthening"
+quantity = "absolute"
+value = "0.397"
+policy = "mutscore"
+suite = "fixtures"
+runtime = "python3.13-scratchpad"
+artifact = "checkers"
+
+[[observation]]
+id = "o_mutscore_after"
+kind = "checkerMutationScore.afterStrengthening"
+quantity = "absolute"
+value = "0.535"
+policy = "mutscore"
+suite = "fixtures"
+runtime = "python3.13-scratchpad"
+artifact = "checkers"
+
+[[claim]]
+id = "c_mutscore"
+text = "Systematic mutation of the checker bodies scored 0.397 against the original fixtures, where the hand-picked mutant set scored 1.000, because the hand-picked mutants were ones their author had already imagined"
+evidence = "observed"
+artifact = "checkers"
+locator = "mutate_checkers.py"
+observations = ["o_mutscore_before"]
+
+[[claim]]
+id = "c_mutscore_after"
+text = "Strengthening the fixtures raised the mutation score to 0.535 at checker digest 1512bfaad353, with 60 mutants still surviving"
+evidence = "observed"
+artifact = "checkers"
+locator = "mutate_checkers.py"
+observations = ["o_mutscore_after"]
+
+[[claim]]
+id = "c_dead_exp"
+text = "The extract checker built an expectation dict whose values were never read, duplicating the same literals inline, so mutating 1987 to 1988 there left every fixture passing"
+evidence = "external"
+locator = "mutate_checkers.py"
+
+[[claim]]
+id = "c_single_branch"
+text = "Each checker had one failure fixture exercising one branch, so extract had five value checks and four of them could be inverted undetected"
+evidence = "external"
+locator = "mutate_checkers.py"
+
+[[claim]]
+id = "c_pii_needle"
+text = "The privacy fixture leaked all four identifiers at once, so any single PII needle could be broken while the others still fired"
+evidence = "external"
+locator = "mutate_checkers.py"
+
+[[claim]]
+id = "c_dead_99"
+text = "The rewrite number pattern captures 99 but the assertion never requires it, so mutating that alternative is undetectable by construction rather than by fixture weakness"
+evidence = "external"
+locator = "mutate_checkers.py"
+
+[[claim]]
+id = "c_hand_picked"
+text = "A hand-picked mutant set measures whether fixtures catch defects their author anticipated; only systematic mutation measures whether they catch defects nobody thought of"
+evidence = "decision"
+locator = "H7"
+
+[[edge]]
+from = "c_mutscore"
+to = "c_hand_picked"
+kind = "supports"
+[[edge]]
+from = "c_mutscore_after"
+to = "c_mutscore"
+kind = "derivedFrom"
+[[edge]]
+from = "c_dead_exp"
+to = "c_mutscore"
+kind = "derivedFrom"
+[[edge]]
+from = "c_single_branch"
+to = "c_mutscore"
+kind = "derivedFrom"
+[[edge]]
+from = "c_pii_needle"
+to = "c_mutscore"
+kind = "derivedFrom"
+[[edge]]
+from = "c_dead_99"
+to = "c_mutscore_after"
+kind = "supports"
+[[edge]]
+from = "c_mutscore_after"
+to = "c_invariant"
+kind = "supports"
