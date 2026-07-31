@@ -107,7 +107,7 @@ are **re-derived** whenever the branch set changes, never renormalised:
 | graph | 0.25 | 0.20 | 0.10 | corroborating; drops as content branches multiply, or one well-connected record drags in its neighbourhood |
 | recency | 0.05 | 0.05 | 0.05 | tiebreaker only; measurements do not decay and retirement is explicit |
 
-Entities are **declared, not inferred**:  is NOT NULL
+Entities are **declared, not inferred**: `mentions.extractor_identity` is NOT NULL
 from the first migration, so a mention must name what found it — which rules out
 a black-box NER. The dictionary is sealed into that identity, so adding an entity
 changes what the same text yields and says so. The trade is deliberate: recall is
