@@ -1,0 +1,15 @@
+# Build output. 1.2 GB against 440 KB of source.
+/target/
+
+# SQLite databases and their WAL/shared-memory sidecars. The store is one file
+# by design, which makes it very easy to commit one by accident.
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Editor and OS noise
+*.swp
+*~
+.DS_Store

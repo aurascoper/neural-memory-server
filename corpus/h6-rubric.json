@@ -1,0 +1,81 @@
+{
+  "preRegisteredAt": "2026-07-30",
+  "preRegistrationNote": "Written BEFORE import-gpd.rs existed. The point of pre-registration is that the required fact set cannot be adjusted to match whatever the importer happened to produce, nor to match an answer that was already given. If this file is edited after a grading run, the run is void.",
+
+  "question": "Why can the Vulkan variant of Gemma 4 12B Q5_K_M not currently be emitted carrying the CPU variant's numericalContractId?",
+
+  "whyThisQuestionIsHard": "The obvious answer is wrong. The characterization document once claimed the cause was that BackendConformancePolicy has no backend dimension; that claim has been retired. An agent that pattern-matches the retired wording will produce a confidently incorrect answer unless it follows the supersession. No single stored record contains the whole chain.",
+
+  "requiredFacts": [
+    {
+      "id": "F1",
+      "claim": "Gemma 4 12B Q5_K_M on Vulkan reached a maximum absolute logit delta of 4.3362 against the CPU reference execution",
+      "why": "The measured quantity. Meaningless without F2 to compare against and without its named reference."
+    },
+    {
+      "id": "F2",
+      "claim": "The logits tolerance of 0.5 was pre-registered on principle before any logits were captured",
+      "why": "The threshold. Pre-registration is what makes the result falsifying rather than fitted."
+    },
+    {
+      "id": "F3",
+      "claim": "ADR-002 decision 6 states that exceeding a declared tolerance is a different contract, not a failed test",
+      "why": "Reframes the verdict as designed behaviour rather than an error."
+    },
+    {
+      "id": "F4",
+      "claim": "A backend whose verdict is RequiresSeparateNumericalContract publishes under its own numericalContractId rather than the reference backend's",
+      "why": "The direct answer to the question: it may not use the CPU's id because it must use its own."
+    },
+    {
+      "id": "F5",
+      "claim": "The section 4 conformance measurement used a single prompt with greedy decoding and no chat template, over 32 steps for Qwen3-8B and 58 steps for Gemma 4 12B",
+      "why": "Bounds what the measurement can support."
+    },
+    {
+      "id": "F6",
+      "claim": "Divergence maxima taken from a single trajectory are lower bounds rather than characterised distributions, so no defensible Vulkan tolerance can yet be pre-registered",
+      "why": "The real blocker: it is a measurement gap, not a schema gap. Cannot be reached without F5."
+    },
+    {
+      "id": "F7",
+      "claim": "Vulkan variants are blocked because BackendConformancePolicy has no backend dimension, so identical terms necessarily yield an identical seal",
+      "why": "RETIRED. A correct answer must either omit this or identify it as superseded. Citing it as current is the failure this test is designed to catch.",
+      "retired": true
+    },
+    {
+      "id": "F8",
+      "claim": "model-variant.schema.json lists numericalContractId among its required properties, so a variant cannot be emitted with the field absent",
+      "why": "Closes the escape hatch of simply omitting the field."
+    }
+  ],
+
+  "scoring": {
+    "method": "set overlap over cited record digests, computed mechanically",
+    "citationRequirement": "The answer must cite record digests. Prose that is correct but cites nothing scores zero, because an uncheckable citation is the thing this store exists to replace.",
+    "pass": "cites records covering F1, F2, F4 and F6, and does NOT present F7 as current",
+    "strongPass": "additionally covers F3, F5 and F8",
+    "fail": "presents F7 as the current explanation, or cites no record digests at all"
+  },
+
+  "arms": [
+    {
+      "id": "a",
+      "name": "mcp",
+      "description": "Agent has the five MCP tools and no transcript.",
+      "expectation": "Reconstructs the chain and cites digests."
+    },
+    {
+      "id": "b",
+      "name": "raw-markdown",
+      "description": "Agent is given the whole characterization document in the prompt and no tools.",
+      "expectation": "Expected to reconstruct correctly. This arm is NOT a control for reconstruction -- it is expected to pass. It is the control for CITABILITY: prose has no addressable unit, so this arm cannot produce checkable citations even when its answer is right. If the store's value were reconstruction alone, this arm would show the store is unnecessary."
+    },
+    {
+      "id": "c",
+      "name": "link-deleted",
+      "description": "Agent has the MCP tools, but the supersedes edge retiring F7 has been removed.",
+      "expectation": "Must report insufficient or conflicting evidence rather than confidently asserting either F7 or its replacement. This is the only arm that tests whether provenance suppresses confabulation, and it is the most informative experiment in the milestone."
+    }
+  ]
+}

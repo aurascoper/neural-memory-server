@@ -1,0 +1,27 @@
+[package]
+name = "neural-memory-mcp"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+neural-memory-domain = { path = "../neural-memory-domain" }
+neural-memory-store = { path = "../neural-memory-store" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[[bin]]
+name = "neural-memory-mcp"
+path = "src/bin/mcp.rs"
+
+[[bin]]
+name = "neural-memory-admin"
+path = "src/bin/admin.rs"
+
+[[bin]]
+name = "neural-memory-import-gpd"
+path = "src/bin/import-gpd.rs"
+
+[[bin]]
+name = "neural-memory-import-contested"
+path = "src/bin/import-contested.rs"

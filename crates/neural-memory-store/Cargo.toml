@@ -1,0 +1,16 @@
+[package]
+name = "neural-memory-store"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+neural-memory-domain = { path = "../neural-memory-domain" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+# `bundled` pins the engine version to the build rather than to whatever the
+# distro ships, so a migration cannot pass here and fail on another machine.
+rusqlite = { version = "0.32", features = ["bundled"] }
+
+[dev-dependencies]
+tempfile = "3"

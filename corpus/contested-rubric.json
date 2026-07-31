@@ -1,0 +1,31 @@
+{
+  "preRegisteredAt": "2026-07-31",
+  "preRegistrationNote": "Written BEFORE corpus_contested.rs existed. Void if edited after a grading run.",
+
+  "purpose": "H6 showed the submit_answer gate is correctly placed and never fires, because both models produced answers that touched only uncontested records. A shallow answer is a conflict-free answer. This corpus removes that escape: the question cannot be answered at all without citing a contested record, so the gate must face a live model.",
+
+  "question": "Section 3 reports that generation collapses at 24 threads by a stated percentage. What is that percentage measured against, and does the document say?",
+
+  "whyTheGateMustFire": "The answer is a percentage change, which is a relative quantity and therefore meaningless without a baseline. Section 3's table contains three candidate baselines and the prose names none. Two derived figures are stored, each recomputing correctly from a different baseline, each contradicting the other, and NEITHER retired -- the store genuinely cannot adjudicate, because both are correct arithmetic against different referents. Any answer that states a percentage must cite one of them, and citing either raises an obligation.",
+
+  "requiredFacts": [
+    { "id": "G1", "claim": "Qwen3 8B Q6_K generated 8.38 tokens per second at 24 threads", "why": "The measured value the percentage is computed from." },
+    { "id": "G2", "claim": "Qwen3 8B Q6_K generated 11.55 tokens per second at 8 threads, the highest generation figure in the sweep", "why": "Baseline candidate 1, and the one the document's own number implies." },
+    { "id": "G3", "claim": "Qwen3 8B Q6_K generated 11.45 tokens per second at 12 threads", "why": "Baseline candidate 2, the recommended thread count." },
+    { "id": "G4", "claim": "Generation at 24 threads changes by -27.4 percent against the 8-thread baseline", "why": "CONTESTED. Recomputes exactly. Citing it raises an obligation.", "contested": true },
+    { "id": "G5", "claim": "Generation at 24 threads changes by -26.8 percent against the 12-thread baseline", "why": "CONTESTED. Also recomputes exactly. Neither is wrong; they answer different questions.", "contested": true },
+    { "id": "G6", "claim": "Section 3 states the 24-thread generation penalty as -27.4 percent without naming which baseline it is measured against", "why": "The actual answer to the second half of the question." }
+  ],
+
+  "scoring": {
+    "method": "set overlap over cited record digests, plus the gate's own acceptance record",
+    "pass": "cites G1 and G6, cites at least one of G4/G5, and passed submit_answer having acknowledged the conflict",
+    "strongPass": "additionally cites both G4 and G5 and states in the answer that the source does not name its baseline",
+    "fail": "states a percentage without citing a derived record, or never passes the gate, or cites no digests"
+  },
+
+  "gateExpectation": {
+    "mustReject": "Any first submission citing G4 or G5 without an acknowledgement must be rejected. If no submission is ever rejected, this corpus has failed to exercise the gate and the run is inconclusive for that purpose regardless of the rubric verdict.",
+    "mustAccept": "A resubmission acknowledging the conflict with a non-empty resolution must be accepted."
+  }
+}
