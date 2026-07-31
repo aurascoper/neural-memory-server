@@ -257,6 +257,7 @@ pub fn call_tool(
                 });
             let opt = RecallOptions {
                 query: &query,
+                entities: true,
                 semantic: sem,
                 as_of: &as_of,
                 limit: args

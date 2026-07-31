@@ -65,6 +65,21 @@ pub struct IngestDoc {
     pub edge: Vec<Edge>,
     #[serde(default)]
     pub supersede: Vec<Supersede>,
+    #[serde(default)]
+    pub entity: Vec<Entity>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct Entity {
+    pub name: String,
+    #[serde(rename = "type")]
+    pub entity_type: String,
+    /// Surface forms that resolve to this entity. The point of the branch is
+    /// aliases that share no wording with the records -- an alias that merely
+    /// repeats the name adds nothing lexical search does not already do.
+    #[serde(default)]
+    pub aliases: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -183,6 +198,7 @@ pub struct IngestReport {
     pub claims: usize,
     pub observations: usize,
     pub edges: usize,
+    pub mentions: usize,
     pub dry_run: bool,
 }
 
@@ -190,7 +206,7 @@ impl std::fmt::Display for IngestReport {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{}{} inserted, {} already present ({} claims, {} observations, {} edges)",
+            "{}{} inserted, {} already present ({} claims, {} observations, {} edges, {} mentions)",
             if self.dry_run {
                 "DRY RUN: would be "
             } else {
@@ -200,7 +216,8 @@ impl std::fmt::Display for IngestReport {
             self.already_present,
             self.claims,
             self.observations,
-            self.edges
+            self.edges,
+            self.mentions
         )
     }
 }
@@ -297,6 +314,7 @@ pub fn ingest(store: &Store, text: &str, dry_run: bool) -> Result<IngestReport, 
         claims: 0,
         observations: 0,
         edges: 0,
+        mentions: 0,
         dry_run,
     };
 
@@ -464,6 +482,20 @@ pub fn ingest(store: &Store, text: &str, dry_run: bool) -> Result<IngestReport, 
         claims.insert(c.id.clone(), id);
     }
 
+    // Entities first, then a reindex, so mentions reflect the dictionary this
+    // document declares rather than whatever was there before.
+    if !doc.entity.is_empty() {
+        for e in &doc.entity {
+            target
+                .put_entity(&neural_memory_domain::EntityTerms {
+                    canonical_name: e.name.clone(),
+                    entity_type: e.entity_type.clone(),
+                    aliases: e.aliases.clone(),
+                })
+                .map_err(|err| format!("entity {:?}: {err}", e.name))?;
+        }
+    }
+
     for e in &doc.edge {
         target
             .add_edge(
@@ -484,6 +516,16 @@ pub fn ingest(store: &Store, text: &str, dry_run: bool) -> Result<IngestReport, 
             )
             .map_err(|e| format!("supersede {} -> {}: {e}", s.retired, s.replacement))?;
     }
+    // Reindex whenever entities exist, not only when this document declared
+    // some: a document adding claims to a store that already has a dictionary
+    // must have those claims indexed too, or they are invisible to the branch.
+    let (dict, _) = target.entity_dictionary().map_err(|e| e.to_string())?;
+    if !dict.is_empty() {
+        let (recs, mentions) = target.reindex_mentions().map_err(|e| e.to_string())?;
+        rep.mentions = mentions;
+        let _ = recs;
+    }
+
     if let Some(tx) = rollback {
         tx.rollback()
             .map_err(|e| format!("dry run rollback: {e}"))?;

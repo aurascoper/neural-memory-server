@@ -99,12 +99,20 @@ Three branches, merged application-side with per-hit attribution: FTS5 `bm25`
 lexical, cosine over stored vectors, and a cycle-guarded provenance walk. Weights
 are **re-derived** whenever the branch set changes, never renormalised:
 
-| signal | M1 | M2 | why |
-|---|---:|---:|---|
-| lexical | 0.70 | 0.45 | exact tokens carry the meaning here — model names, metrics, thread counts |
-| semantic | — | 0.30 | finds the paraphrase the wording missed, which is the whole reason to add it |
-| graph | 0.25 | 0.20 | a record reachable from a hit is corroborating |
-| recency | 0.05 | 0.05 | tiebreaker only; measurements do not decay and retirement is explicit |
+| signal | M1 | +semantic | +entity | why |
+|---|---:|---:|---:|---|
+| lexical | 0.70 | 0.45 | 0.40 | exact tokens carry the meaning here — model names, metrics, thread counts |
+| semantic | — | 0.30 | 0.25 | finds the paraphrase the wording missed |
+| entity | — | — | 0.20 | resolves an *alias* to the entity a record names — the one thing neither other branch does |
+| graph | 0.25 | 0.20 | 0.10 | corroborating; drops as content branches multiply, or one well-connected record drags in its neighbourhood |
+| recency | 0.05 | 0.05 | 0.05 | tiebreaker only; measurements do not decay and retirement is explicit |
+
+Entities are **declared, not inferred**:  is NOT NULL
+from the first migration, so a mention must name what found it — which rules out
+a black-box NER. The dictionary is sealed into that identity, so adding an entity
+changes what the same text yields and says so. The trade is deliberate: recall is
+bounded by what you thought to declare, and in exchange every mention is
+reproducible and attributable.
 
 Semantic deliberately does not take the largest share. "Qwen3 8B at 24 threads"
 is a lexical question, and an embedding that treats 8 and 24 as interchangeable
@@ -207,7 +215,7 @@ exists, and are void if edited after a grading run.
   **changed the top hit on none of them**; on two queries the extra records were
   plainly off-topic. It is correct and it is not yet earning its keep. See
   [Retrieval](#retrieval).
-- **Still unbuilt**: entity retrieval branch, temporal queries, as-of time travel.
+- **Still unbuilt**: temporal queries, as-of time travel.
 - **Concurrency is untested.** One SQLite file, WAL mode, multiple clients.
 - **No backup procedure.** Backup is copying the file; that is not the same as
   having tested a restore.

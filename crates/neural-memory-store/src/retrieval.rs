@@ -54,9 +54,23 @@ use crate::{Store, StoreError};
 //
 // Recency stays a tiebreaker at 0.05 for the M1 reason, unchanged: measurements
 // do not decay, and retirement is explicit rather than implied by age.
-pub const W_LEXICAL: f64 = 0.45;
-pub const W_SEMANTIC: f64 = 0.30;
-pub const W_GRAPH: f64 = 0.20;
+// M1 (lexical, graph, recency):        0.70 / --   / --   / 0.25 / 0.05
+// M2 + semantic:                        0.45 / 0.30 / --   / 0.20 / 0.05
+// M2 + entity (here):                   0.40 / 0.25 / 0.20 / 0.10 / 0.05
+//
+// Re-derived a third time rather than renormalised. Entity earns 0.20 for one
+// reason: alias resolution. It is nearly redundant with lexical when a query
+// spells an entity out -- full-text search finds "Gemma" in text saying
+// "Gemma", and better. Its unique contribution is resolving "the 12B model" to
+// the entity a record names, which neither lexical nor semantic does reliably.
+//
+// Graph drops to 0.10 because with three content branches feeding it, a record
+// now reaches the seed set on its own merits far more often; leaving graph high
+// would let one well-connected record drag in its whole neighbourhood.
+pub const W_LEXICAL: f64 = 0.40;
+pub const W_SEMANTIC: f64 = 0.25;
+pub const W_ENTITY: f64 = 0.20;
+pub const W_GRAPH: f64 = 0.10;
 pub const W_RECENCY: f64 = 0.05;
 
 /// Long on purpose. A measurement from six months ago is still a measurement;
@@ -68,6 +82,7 @@ pub const RECENCY_HALF_LIFE_DAYS: f64 = 180.0;
 pub enum Branch {
     Lexical,
     Semantic,
+    Entity,
     Provenance,
 }
 
@@ -94,6 +109,9 @@ pub struct Hit {
     /// Cosine similarity in the query's embedding space. `None` when this
     /// record carries no vector there, which is different from scoring zero.
     pub semantic_score: Option<f64>,
+    /// How many distinct entities named by the query this record also mentions.
+    /// `None` when the entity branch did not run or found nothing here.
+    pub shared_entities: Option<usize>,
     pub graph_distance: Option<u32>,
     pub recency_score: f64,
     /// True when this record has been retired. Present only when the caller
@@ -117,6 +135,7 @@ pub struct Hit {
 pub struct BranchCounts {
     pub lexical: usize,
     pub semantic: usize,
+    pub entity: usize,
     pub provenance: usize,
     pub unique: usize,
 }
@@ -148,6 +167,9 @@ pub struct SemanticQuery<'a> {
 
 pub struct RecallOptions<'a> {
     pub query: &'a str,
+    /// Run the entity branch. Costs a dictionary rebuild per query, so it is
+    /// opt-out for callers that know the corpus declares no entities.
+    pub entities: bool,
     /// `None` disables the semantic branch entirely, which is the correct
     /// behaviour when no embedder is reachable: lexical and provenance still
     /// work, and the caller is told the branch was absent rather than being
@@ -167,6 +189,7 @@ impl Default for RecallOptions<'_> {
     fn default() -> Self {
         Self {
             query: "",
+            entities: true,
             semantic: None,
             as_of: "2026-01-01T00:00:00Z",
             limit: 20,
@@ -206,6 +229,7 @@ struct Candidate {
     evidence_class: String,
     lexical_raw: Option<f64>,
     semantic_raw: Option<f64>,
+    entity_shared: Option<usize>,
     graph_distance: Option<u32>,
     age_days: Option<f64>,
     superseded_at: Option<String>,
@@ -265,6 +289,7 @@ impl Store {
                         // so larger means more relevant, then normalise below.
                         lexical_raw: Some(-rank),
                         semantic_raw: None,
+                        entity_shared: None,
                         graph_distance: None,
                         age_days: age,
                         superseded_at: sup_at,
@@ -316,7 +341,41 @@ impl Store {
             }
         }
 
-        // ---- branch 3: provenance expansion from the seeds ------------------
+        // ---- branch 3: entity -----------------------------------------------
+        // Runs the SAME extractor over the query as over the corpus, so an
+        // alias in the question resolves to the entity a record names. A
+        // different matcher on either side would make the branch unexplainable.
+        if opt.entities {
+            let (dict, _) = self.entity_dictionary()?;
+            let found = self.entity_search(opt.query, &dict, opt.limit * 4, opt.include_retired)?;
+            for h in found {
+                if let Some(existing) = cands.get_mut(&h.record_digest) {
+                    if !existing.branches.contains(&Branch::Entity) {
+                        existing.branches.push(Branch::Entity);
+                    }
+                    existing.entity_shared = Some(h.shared_entities);
+                    continue;
+                }
+                let Some(c) = self.load_candidate(&h.record_digest, opt.as_of)? else {
+                    continue;
+                };
+                if c.superseded_at.is_some() && !opt.include_retired {
+                    withheld.push(h.record_digest);
+                    continue;
+                }
+                lexical_seeds.push(h.record_digest.clone());
+                cands.insert(
+                    h.record_digest,
+                    Candidate {
+                        entity_shared: Some(h.shared_entities),
+                        branches: vec![Branch::Entity],
+                        ..c
+                    },
+                );
+            }
+        }
+
+        // ---- branch 4: provenance expansion from the seeds ------------------
         if opt.max_hops > 0 {
             for seed in &lexical_seeds {
                 for (digest, depth) in self.traverse(seed, Direction::Both, opt.max_hops)? {
@@ -381,8 +440,20 @@ impl Store {
                 // unrelatedness, not of relevance, so it is floored rather than
                 // allowed to drag a record below one carrying no vector at all.
                 let sem = c.semantic_raw.map(|v| v.clamp(0.0, 1.0));
+                // Saturating, but generous at n=1. The obvious curve
+                // `1 - 1/(1+n)` gives 0.5 for a single shared entity, which put
+                // a direct entity match at 0.20*0.5 = 0.10 -- exactly tying a
+                // bare one-hop provenance neighbour. Found on live data, where
+                // an alias-only query returned the record it actually named
+                // level with two records merely adjacent to something.
+                //
+                // `n/(n+0.5)` gives 0.67 / 0.80 / 0.86: a record the query
+                // names outranks one that is merely near something, while a
+                // record naming a dozen entities still cannot run away with it.
+                let ent = c.entity_shared.map(|n| n as f64 / (n as f64 + 0.5));
                 let score = W_LEXICAL * lex.unwrap_or(0.0)
                     + W_SEMANTIC * sem.unwrap_or(0.0)
+                    + W_ENTITY * ent.unwrap_or(0.0)
                     + W_GRAPH * graph
                     + W_RECENCY * rec;
                 Hit {
@@ -393,6 +464,7 @@ impl Store {
                     branches: c.branches,
                     lexical_score: lex,
                     semantic_score: sem,
+                    shared_entities: c.entity_shared,
                     graph_distance: c.graph_distance,
                     recency_score: rec,
                     superseded: c.superseded_at.is_some(),
@@ -472,6 +544,10 @@ impl Store {
                 .iter()
                 .filter(|h| h.branches.contains(&Branch::Semantic))
                 .count(),
+            entity: hits
+                .iter()
+                .filter(|h| h.branches.contains(&Branch::Entity))
+                .count(),
             provenance: hits
                 .iter()
                 .filter(|h| h.branches.contains(&Branch::Provenance))
@@ -506,6 +582,7 @@ impl Store {
                 evidence_class: r.get(1)?,
                 lexical_raw: None,
                 semantic_raw: None,
+                entity_shared: None,
                 graph_distance: None,
                 age_days: r.get(2)?,
                 superseded_at: r.get(3)?,

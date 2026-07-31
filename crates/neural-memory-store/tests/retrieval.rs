@@ -29,6 +29,7 @@ fn claim(s: &Store, text: &str, occurred_at: Option<&str>) -> String {
 
 fn opts<'a>(query: &'a str) -> RecallOptions<'a> {
     RecallOptions {
+        entities: true,
         semantic: None,
         query,
         as_of: NOW,

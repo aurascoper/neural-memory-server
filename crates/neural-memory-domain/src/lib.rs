@@ -28,6 +28,7 @@
 
 pub mod assembler;
 pub mod digest;
+pub mod entity;
 pub mod terms;
 
 pub use assembler::{
@@ -35,6 +36,9 @@ pub use assembler::{
     simulate_rebuild_per_turn, AppendPlan, AssemblerConfig, SessionCost, SessionPrefix,
 };
 pub use digest::{sha256_hex, valid_sha256};
+pub use entity::{
+    entity_identity, extract_mentions, EntityDictionary, EntityTerms, Mention, EXTRACTOR_ALGORITHM,
+};
 pub use terms::{
     artifact_identity, embedding_space_identity, evaluation_suite_identity,
     measurement_policy_identity, memory_record_identity, observation_identity,
