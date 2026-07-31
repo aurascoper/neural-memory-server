@@ -36,3 +36,7 @@ path = "src/bin/ingest.rs"
 [[bin]]
 name = "neural-memory-embed"
 path = "src/bin/embed.rs"
+
+[[bin]]
+name = "neural-memory-eval-retrieval"
+path = "src/bin/eval-retrieval.rs"

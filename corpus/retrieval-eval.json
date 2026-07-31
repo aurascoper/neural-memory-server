@@ -1,0 +1,56 @@
+{
+  "preRegisteredAt": "2026-07-31",
+  "preRegistrationNote": "Queries, relevance labels, metric and pass conditions all fixed BEFORE any ablation was run. Void if edited after a run. Relevance was judged as 'would a careful reader say this record answers the question', not 'which branch would find it'.",
+
+  "knownBias": "The same author wrote the corpus, the branches and these queries. Paraphrases I choose may be ones the embedder happens to handle. This is a real limitation and no result here should be read as generalising beyond this corpus. It is mitigated only by fixing labels in advance and reporting per class rather than in aggregate.",
+
+  "whyPerClass": "An aggregate number would hide the answer. Semantic is supposed to win on paraphrase and lose nothing on verbatim; averaging those together produces a single figure that is true and uninformative.",
+
+  "metric": "recall@5 and MRR@10, macro-averaged within each class",
+  "arms": {
+    "lexical": "FTS5 only. semantic off, entities off, maxHops 0",
+    "lexical+semantic": "semantic on, entities off, maxHops 0",
+    "lexical+entity": "semantic off, entities on, maxHops 0",
+    "all": "everything on, maxHops 1"
+  },
+
+  "passConditions": {
+    "semantic": "JUSTIFIED if it raises mean MRR on classes B and D by >= 0.05 absolute over lexical alone, AND lowers mean MRR on class A by no more than 0.05. Otherwise NOT JUSTIFIED on this corpus.",
+    "entity": "JUSTIFIED if it raises mean MRR on class C by >= 0.05 over lexical alone, AND lowers no other class by more than 0.05."
+  },
+
+  "classes": {
+    "A_verbatim": "wording lifted from the record; lexical should win",
+    "B_paraphrase": "same meaning, different words; semantic should win if it works at all",
+    "C_alias": "uses a declared entity alias; entity should win",
+    "D_conceptual": "asks about a topic without naming specifics; hardest for all branches"
+  },
+
+  "queries": [
+    {"id":"A1","class":"A_verbatim","q":"maximum absolute logit delta 4.3362","relevant":[0]},
+    {"id":"A2","class":"A_verbatim","q":"logits tolerance 0.5 pre-registered on principle","relevant":[2]},
+    {"id":"A3","class":"A_verbatim","q":"generated 11.55 tokens per second at 8 threads","relevant":[18]},
+    {"id":"A4","class":"A_verbatim","q":"model-variant.schema.json numericalContractId required properties","relevant":[8]},
+    {"id":"A5","class":"A_verbatim","q":"prompt tokens per second on Vulkan under AC power","relevant":[13]},
+
+    {"id":"B1","class":"B_paraphrase","q":"how far apart were the graphics and processor numbers for Gemma","relevant":[0,5]},
+    {"id":"B2","class":"B_paraphrase","q":"what threshold was fixed in advance before measuring","relevant":[2]},
+    {"id":"B3","class":"B_paraphrase","q":"which thread count gave the fastest text output","relevant":[18]},
+    {"id":"B4","class":"B_paraphrase","q":"can a variant simply leave the contract field out","relevant":[8]},
+    {"id":"B5","class":"B_paraphrase","q":"does running unplugged change the speed","relevant":[13,14]},
+
+    {"id":"C1","class":"C_alias","q":"correctness escalation candidate divergence","relevant":[0,5]},
+    {"id":"C2","class":"C_alias","q":"what did the responsive default do at 24 threads","relevant":[17]},
+    {"id":"C3","class":"C_alias","q":"the GPU path against the reference backend","relevant":[0,1]},
+    {"id":"C4","class":"C_alias","q":"balanced experimental alternative throughput","relevant":[13]},
+    {"id":"C5","class":"C_alias","q":"the seal and the contract id","relevant":[7,8,9]},
+
+    {"id":"D1","class":"D_conceptual","q":"why can the two backends not share a contract","relevant":[7,11,4]},
+    {"id":"D2","class":"D_conceptual","q":"is there an ambiguity in how a percentage was computed","relevant":[23,21,22]},
+    {"id":"D3","class":"D_conceptual","q":"what evidence is still missing","relevant":[15,16,4]},
+    {"id":"D4","class":"D_conceptual","q":"does caching change the cost of a long prompt","relevant":[24,25,26]},
+    {"id":"D5","class":"D_conceptual","q":"what happens to generation when you use too many threads","relevant":[17,21,22,23]}
+  ],
+
+  "corpusOrder": "relevant[] are indices into the store ordered by recorded_seq, resolved to digests by the harness"
+}

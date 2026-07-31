@@ -230,11 +230,13 @@ exists, and are void if edited after a grading run.
 
 ## Known limits
 
-- **The semantic branch is built but not shown to help.** Over the current
-  26-record corpus it surfaced 5 records lexical missed across 5 queries and
-  **changed the top hit on none of them**; on two queries the extra records were
-  plainly off-topic. It is correct and it is not yet earning its keep. See
-  [Retrieval](#retrieval).
+- **Retrieval branches are measured, on a small set.** Both semantic and entity
+  pass their pre-registered conditions — semantic +0.087 MRR on paraphrase and
+  conceptual queries at zero cost to verbatim, entity +0.333 on alias queries
+  and +0.233 even given semantic. But **n = 5 per class**, so one query moving
+  one rank shifts a class mean by 0.10 and the headline gain is about one
+  query's worth of movement. Direction is consistent; magnitudes are not robust.
+  See [m2-retrieval-ablation.md](docs/acceptance/m2-retrieval-ablation.md).
 - **Transaction time is unknown for early records.** Everything written before
   migration 0003 has an ordering (`recorded_seq`) but no `recorded_at` instant,
   so `as_of` on a date in that range reports `unknownBefore` rather than
