@@ -9,11 +9,13 @@ use std::path::Path;
 use rusqlite::{Connection, OpenFlags};
 
 pub mod derive;
+pub mod ingest;
 pub mod migrate;
 pub mod retrieval;
 pub mod write;
 
 pub use derive::{Derivation, DerivationError};
+pub use ingest::{ingest, validate, IngestDoc, IngestReport};
 pub use retrieval::{
     Branch, BranchCounts, ConflictObligation, Direction, EdgeDetail, Hit, ObservationDetail,
     ProvenanceStep, RecallOptions, RecallResult, RecordDetail,

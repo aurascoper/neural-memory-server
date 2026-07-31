@@ -1,0 +1,193 @@
+# The contested corpus, as data rather than as Rust.
+#
+# This is the same evidence `corpus_contested.rs` writes by hand. It exists to
+# prove the ingest format is general enough to express a real corpus, including
+# the awkward parts: a genuine unresolved disagreement, two derivations the
+# store re-runs, and claims whose evidence class has to be earned.
+#
+# `tests/ingest.rs` asserts this file produces byte-identical record digests to
+# the Rust importer. If the format could not express something, that test fails
+# rather than the gap going unnoticed.
+
+version = 1
+run_id = "gpd-thread-sweep-20260730"
+recorded_at = "2026-07-31T00:00:00Z"
+
+[[artifact]]
+id = "doc"
+kind = "characterization-document"
+sha256 = "381918cf16b054a7924f4b02acc581b96e181eed0dd1dc7a004273371363e905"
+bytes = 27512
+media_type = "text/markdown"
+uri = "file:///home/aurascoper/Downloads/gpd-vulkan-characterization-20260730.md"
+
+[[suite]]
+id = "sweep"
+name = "llama-bench-thread-sweep"
+# Hashed for you, so the invocation stays readable in the file that records it.
+case_texts = ["-p 512 -n 128 -ctk q8_0 -ctv q8_0 -r 5"]
+tokenizer = "qwen3-native"
+context_cap = 8192
+
+[[policy]]
+id = "tgps"
+metric = "generatedTokensPerSecond"
+aggregation = "meanOfFiveRepetitions"
+comparison_rule = "reportOnly"
+step_budget = 5
+unit = "tokensPerSecond"
+
+# --- §3 thread sweep, tg128 -------------------------------------------------
+# Values are QUOTED. A bare TOML number is a float, and a float in a sealed
+# document is at the mercy of the serialiser's formatter.
+
+[[observation]]
+id = "t24"
+kind = "tg128.threads24"
+quantity = "absolute"
+value = "8.38"
+policy = "tgps"
+suite = "sweep"
+runtime = "llama.cpp-b10188-d0bfb1981"
+artifact = "doc"
+
+[[observation]]
+id = "t16"
+kind = "tg128.threads16"
+quantity = "absolute"
+value = "11.40"
+policy = "tgps"
+suite = "sweep"
+runtime = "llama.cpp-b10188-d0bfb1981"
+artifact = "doc"
+
+[[observation]]
+id = "t12"
+kind = "tg128.threads12"
+quantity = "absolute"
+value = "11.45"
+policy = "tgps"
+suite = "sweep"
+runtime = "llama.cpp-b10188-d0bfb1981"
+artifact = "doc"
+
+[[observation]]
+id = "t8"
+kind = "tg128.threads8"
+quantity = "absolute"
+value = "11.55"
+policy = "tgps"
+suite = "sweep"
+runtime = "llama.cpp-b10188-d0bfb1981"
+artifact = "doc"
+
+# --- the measurements -------------------------------------------------------
+
+[[claim]]
+id = "g1"
+text = "Qwen3 8B Q6_K generated 8.38 tokens per second at 24 threads"
+evidence = "observed"
+artifact = "doc"
+locator = "§3 table"
+observations = ["t24"]
+
+[[claim]]
+id = "g2"
+text = "Qwen3 8B Q6_K generated 11.55 tokens per second at 8 threads, the highest generation figure in the sweep"
+evidence = "observed"
+artifact = "doc"
+locator = "§3 table"
+observations = ["t8"]
+
+[[claim]]
+id = "g3"
+text = "Qwen3 8B Q6_K generated 11.45 tokens per second at 12 threads"
+evidence = "observed"
+artifact = "doc"
+locator = "§3 table"
+observations = ["t12"]
+
+[[claim]]
+id = "g_t16"
+text = "Qwen3 8B Q6_K generated 11.40 tokens per second at 16 threads"
+evidence = "observed"
+artifact = "doc"
+locator = "§3 table"
+observations = ["t16"]
+
+# --- the two rivals ---------------------------------------------------------
+# Each is `derived`, so the store re-runs the arithmetic and refuses a mismatch.
+# Both check out against different baselines, which is what makes this a real
+# disagreement rather than one of them being a mistake. The prose in §3 names
+# neither baseline.
+
+[[claim]]
+id = "g4"
+text = "Generation at 24 threads changes by -27.4 percent against the 8-thread baseline"
+evidence = "derived"
+artifact = "doc"
+locator = "§3 derived"
+observations = ["t24", "t8"]
+[claim.derivation]
+transform = "percentChange"
+value = "t24"
+baseline = "t8"
+decimals = 1
+
+[[claim]]
+id = "g5"
+text = "Generation at 24 threads changes by -26.8 percent against the 12-thread baseline"
+evidence = "derived"
+artifact = "doc"
+locator = "§3 derived"
+observations = ["t24", "t12"]
+[claim.derivation]
+transform = "percentChange"
+value = "t24"
+baseline = "t12"
+decimals = 1
+
+[[claim]]
+id = "g6"
+text = "Section 3 states the 24-thread generation penalty as -27.4 percent without naming which baseline it is measured against"
+evidence = "observed"
+artifact = "doc"
+locator = "§3 prose"
+
+# --- the contest ------------------------------------------------------------
+# NOT a supersession. `supersede` would assert the store knows which baseline
+# the document meant, and it does not — that is the whole finding.
+
+[[edge]]
+from = "g4"
+to = "g5"
+kind = "contradicts"
+
+[[edge]]
+from = "g4"
+to = "g1"
+kind = "derivedFrom"
+[[edge]]
+from = "g4"
+to = "g2"
+kind = "derivedFrom"
+[[edge]]
+from = "g5"
+to = "g1"
+kind = "derivedFrom"
+[[edge]]
+from = "g5"
+to = "g3"
+kind = "derivedFrom"
+[[edge]]
+from = "g6"
+to = "g4"
+kind = "supports"
+[[edge]]
+from = "g6"
+to = "g5"
+kind = "supports"
+[[edge]]
+from = "g_t16"
+to = "g1"
+kind = "supports"

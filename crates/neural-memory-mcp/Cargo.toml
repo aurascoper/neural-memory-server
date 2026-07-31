@@ -25,3 +25,7 @@ path = "src/bin/import-gpd.rs"
 [[bin]]
 name = "neural-memory-import-contested"
 path = "src/bin/import-contested.rs"
+
+[[bin]]
+name = "neural-memory-ingest"
+path = "src/bin/ingest.rs"
