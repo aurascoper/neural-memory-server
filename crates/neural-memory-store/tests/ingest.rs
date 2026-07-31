@@ -207,3 +207,42 @@ fn an_unsupported_version_is_refused() {
     let e = validate("version = 2\nrecorded_at = \"2026-07-31T00:00:00Z\"\n").unwrap_err();
     assert!(e.contains("unsupported version 2"), "{e}");
 }
+
+#[test]
+fn a_document_that_fails_partway_writes_nothing() {
+    // Observed for real: a dangling edge alias left 14 claims written and the
+    // wiring missing. A half-applied evidence document is worse than none,
+    // because it looks complete.
+    let s = Store::open_in_memory().unwrap();
+    let before: i64 = s
+        .conn
+        .query_row("SELECT count(*) FROM memories", [], |r| r.get(0))
+        .unwrap();
+    let bad = doc(
+        "[[claim]]\nid = \"a\"\ntext = \"a claim that should not survive\"\n\
+         evidence = \"external\"\n\n\
+         [[edge]]\nfrom = \"a\"\nto = \"ghost\"\nkind = \"supports\"\n",
+    );
+    assert!(ingest(&s, &bad, false).is_err());
+    let after: i64 = s
+        .conn
+        .query_row("SELECT count(*) FROM memories", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(
+        before, after,
+        "a failed ingest must leave the store untouched"
+    );
+
+    // Polarity: the same document with a valid edge target does commit.
+    let good = doc(
+        "[[claim]]\nid = \"a\"\ntext = \"a claim\"\nevidence = \"external\"\n\n\
+         [[claim]]\nid = \"b\"\ntext = \"another\"\nevidence = \"external\"\n\n\
+         [[edge]]\nfrom = \"a\"\nto = \"b\"\nkind = \"supports\"\n",
+    );
+    assert!(ingest(&s, &good, false).is_ok());
+    let n: i64 = s
+        .conn
+        .query_row("SELECT count(*) FROM memories", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(n, 2);
+}

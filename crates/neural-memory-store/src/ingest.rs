@@ -323,16 +323,15 @@ pub fn ingest(store: &Store, text: &str, dry_run: bool) -> Result<IngestReport, 
     // report every already-present record as an insert, so the one number the
     // operator is checking -- how much this document actually adds -- would be
     // wrong exactly when it matters.
-    let rollback = if dry_run {
-        Some(
-            store
-                .conn
-                .unchecked_transaction()
-                .map_err(|e| format!("dry run: {e}"))?,
-        )
-    } else {
-        None
-    };
+    // Every ingest runs in a transaction, dry or not. A dry run rolls it back;
+    // a real one commits only if the WHOLE document applied. A half-applied
+    // evidence document is worse than none because it looks complete --
+    // observed for real when a dangling edge alias left the claims written and
+    // the wiring missing.
+    let tx = store
+        .conn
+        .unchecked_transaction()
+        .map_err(|e| format!("ingest transaction: {e}"))?;
     let target: &Store = store;
 
     let mut artifacts = BTreeMap::new();
@@ -533,9 +532,11 @@ pub fn ingest(store: &Store, text: &str, dry_run: bool) -> Result<IngestReport, 
         let _ = recs;
     }
 
-    if let Some(tx) = rollback {
+    if dry_run {
         tx.rollback()
             .map_err(|e| format!("dry run rollback: {e}"))?;
+    } else {
+        tx.commit().map_err(|e| format!("ingest commit: {e}"))?;
     }
     Ok(rep)
 }
