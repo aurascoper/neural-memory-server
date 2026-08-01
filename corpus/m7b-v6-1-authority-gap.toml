@@ -1,0 +1,224 @@
+# M7-B v6-1 hardening: the authority gap that survived the first pass.
+#
+# NeuralCompose commit 54f2a31, following a3a8382 on the same branch.
+#
+# This exists because the first pass READ as complete and was not. It passed
+# eight adversarial regressions, every CI gate at the exact head, and a written
+# review of its own limitations -- and still shipped a hole that a reviewer
+# found by reading what validate_v6_declaration actually checks rather than
+# what its commit message claimed. Recording the shape of that miss is worth
+# more than recording the fix.
+
+version = 1
+run_id = "m7b-v6-1-authority-gap"
+recorded_at = "2026-07-31T23:40:00Z"
+
+[[artifact]]
+id = "module2"
+kind = "source"
+sha256 = "76f2e538bc7ff6216aa5d11aa8ba51903529b75612c5b0483578852e2ef9dc65"
+bytes = 107065
+media_type = "text/x-rust"
+uri = "file:///crates/neuralcompose-mobile-core/src/generation_eval.rs"
+
+[[artifact]]
+id = "suite2"
+kind = "test-source"
+sha256 = "c3ac86421e2924c48f523e0f29df7b76b2233c63eb39807a8f9bede463ee4c00"
+bytes = 72659
+media_type = "text/x-rust"
+uri = "file:///crates/neuralcompose-mobile-core/tests/m7b_eval_protocol.rs"
+
+[[policy]]
+id = "mutation"
+metric = "testsFailingWhenGuardRemoved"
+aggregation = "countOfTests"
+comparison_rule = "higherIsBetter"
+unit = "test"
+
+[[suite]]
+id = "auth"
+name = "m7b-v6-1-authority"
+case_texts = [
+  "editing_a_single_prompt_message_is_rejected_even_though_the_quotas_still_hold",
+  "a_shape_valid_replacement_corpus_is_rejected_as_not_build_owned",
+  "a_correctly_domained_but_unknown_policy_id_is_rejected",
+  "a_mutually_consistent_corpus_and_quota_pair_is_still_rejected_if_it_is_not_ours",
+  "the_shape_checks_still_guard_the_committed_artifact_itself",
+]
+tokenizer = "none"
+context_cap = 1
+
+[[observation]]
+id = "o_mut_auth"
+kind = "testsFailingWhenGuardRemoved.corpusAuthority"
+quantity = "absolute"
+value = "4"
+policy = "mutation"
+suite = "auth"
+runtime = "rustc-1.97.1-x86_64-unknown-linux-gnu"
+artifact = "suite2"
+
+[[observation]]
+id = "o_mut_doc"
+kind = "testsFailingWhenGuardRemoved.compileFailPair"
+quantity = "absolute"
+value = "2"
+policy = "mutation"
+suite = "auth"
+runtime = "rustc-1.97.1-x86_64-unknown-linux-gnu"
+artifact = "module2"
+
+[[observation]]
+id = "o_tests2"
+kind = "passingTests.workspace"
+quantity = "absolute"
+value = "175"
+policy = "mutation"
+suite = "auth"
+runtime = "rustc-1.97.1-x86_64-unknown-linux-gnu"
+artifact = "suite2"
+
+# ---------------------------------------------------------------------------
+# The defect
+# ---------------------------------------------------------------------------
+
+[[claim]]
+id = "c_gap"
+text = "Removing a forgeable corpus digest made the corpus content-addressed but not build-owned: validate_v6_declaration checked the corpus for shape only, and shape is satisfiable by a corpus nobody reviewed, so a caller could submit a different eighteen-prompt corpus, let Rust derive its identity honestly, pass validation, and replace the reviewed study without forging anything"
+evidence = "external"
+locator = "commit a3a8382"
+
+[[claim]]
+id = "c_gap_policy"
+text = "The same gap covered the composition policy and the evaluator policy identities, where a correct domain prefix with a different version suffix passed the prefix check, so an unknown evaluator could name itself under the right domain and be accepted"
+evidence = "external"
+locator = "commit a3a8382"
+
+[[claim]]
+id = "c_two_questions"
+text = "The underlying error was conflating two questions and asking only one: whether a corpus is well formed, and whether a corpus is ours; content-addressing answers neither, it only establishes that an identity cannot be forged"
+evidence = "decision"
+locator = "commit 54f2a31"
+
+# ---------------------------------------------------------------------------
+# The fix, and why the older checks stay
+# ---------------------------------------------------------------------------
+
+[[claim]]
+id = "c_exact_equality"
+text = "The declaration now requires exact equality against the compiled-in corpus, composition policy and evaluator policy identities, so the caller is never the party that says what the study is over"
+evidence = "observed"
+artifact = "module2"
+locator = "crates/neuralcompose-mobile-core/src/generation_eval.rs"
+
+[[claim]]
+id = "c_shape_not_redundant"
+text = "The shape checks are not made redundant by the authority check: they are what catches a bad edit to the committed artifact itself, where frozen_corpus_v1 returns the bad corpus and equality therefore holds, and one regression pins exactly that by remaining green when the authority check is removed"
+evidence = "observed"
+artifact = "suite2"
+locator = "tests/m7b_eval_protocol.rs"
+
+[[claim]]
+id = "c_mutation_auth"
+text = "Removing the three authority checks fails exactly the four new authority regressions and nothing else, which is what distinguishes them from the shape checks that were already present"
+evidence = "observed"
+artifact = "suite2"
+locator = "tests/m7b_eval_protocol.rs"
+observations = ["o_mut_auth"]
+
+[[claim]]
+id = "c_compile_pairs"
+text = "The compile-level check is paired doctests rather than a trybuild dependency because doctests already run in this CI; the pairing is required because a compile_fail block alone passes when the code fails to compile for any reason at all, so each has a companion differing only by the digest that must compile"
+evidence = "observed"
+artifact = "module2"
+locator = "crates/neuralcompose-mobile-core/src/generation_eval.rs"
+
+[[claim]]
+id = "c_mutation_doc"
+text = "Reintroducing corpus_sha256_hex on BenchmarkCorpus flips exactly that doctest pair, the compile_fail half by starting to compile and its companion by ceasing to, while the V6Declaration and corpus_identity pairs stay green because only one type was mutated"
+evidence = "observed"
+artifact = "module2"
+locator = "crates/neuralcompose-mobile-core/src/generation_eval.rs"
+observations = ["o_mut_doc"]
+
+[[claim]]
+id = "c_three_layers"
+text = "No single layer is sufficient: compile-fail pairs cannot catch a digest reintroduced under a different name, the source scan cannot prove a construction is impossible, and neither can stop a shape-valid corpus that was never reviewed, so all three are kept"
+evidence = "decision"
+locator = "crates/neuralcompose-mobile-core/src/generation_eval.rs"
+
+[[claim]]
+id = "c_no_ffi_change"
+text = "The hardening changed two files and produced no binding drift, because the FFI surface is unchanged and only validation semantics moved"
+evidence = "observed"
+artifact = "module2"
+locator = "M7-B hardening"
+observations = ["o_tests2"]
+
+[[claim]]
+id = "c_registry"
+text = "If a later protocol version needs several corpora the answer is a build-owned registry with a membership check, not reopening arbitrary corpus injection"
+evidence = "decision"
+locator = "crates/neuralcompose-mobile-core/src/generation_eval.rs"
+
+# ---------------------------------------------------------------------------
+# What this says about the first pass
+# ---------------------------------------------------------------------------
+
+[[claim]]
+id = "c_lesson"
+text = "The first pass passed eight adversarial regressions, every CI gate at the exact head, and a written self-review of its own limitations, and still shipped the gap; the regressions tested that the declaration rejects what it says it rejects, which is a weaker property than the declaration accepting only what it should accept"
+evidence = "decision"
+locator = "M7-B hardening"
+
+[[claim]]
+id = "c_swift_still_open"
+text = "The iOS smoke test remains uncompiled after both commits and is the one outstanding blocker on calling issue #7 merge-grade; it constructs the v6 declaration and exercises the generated bindings, so it is genuine cross-language evidence once it runs and no evidence at all until then"
+evidence = "external"
+locator = "ios/NeuralComposeCore/Tests/SmokeTests.swift"
+
+[[edge]]
+from = "c_exact_equality"
+to = "c_gap"
+kind = "refutes"
+
+[[edge]]
+from = "c_exact_equality"
+to = "c_gap_policy"
+kind = "refutes"
+
+[[edge]]
+from = "c_two_questions"
+to = "c_gap"
+kind = "derivedFrom"
+
+[[edge]]
+from = "c_mutation_auth"
+to = "c_exact_equality"
+kind = "supports"
+
+[[edge]]
+from = "c_mutation_doc"
+to = "c_compile_pairs"
+kind = "supports"
+
+[[edge]]
+from = "c_shape_not_redundant"
+to = "c_exact_equality"
+kind = "contradicts"
+
+[[edge]]
+from = "c_three_layers"
+to = "c_compile_pairs"
+kind = "supports"
+
+[[edge]]
+from = "c_lesson"
+to = "c_gap"
+kind = "derivedFrom"
+
+[[edge]]
+from = "c_registry"
+to = "c_exact_equality"
+kind = "derivedFrom"
