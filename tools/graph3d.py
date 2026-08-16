@@ -209,9 +209,65 @@ def render(nodes, edges, dangling, edge_refd, sha, ts, screenshot=None):
             "isolated": len(isolated), "components": n_comps, "ring": len(loners)}
 
 
+def export_npz(copy_path, sha, ts, session_id, utc_range, out_path):
+    """Session-scoped neutral artifact: the provenance NEIGHBOURHOOD of records
+    created during the session (source_locator match, or occurred_at in the UTC
+    range when one is given), expanded 1 hop. Layout is computed here so a
+    downstream viewer renders without computing. An empty neighbourhood is an
+    honest result (no live ingestion path exists from neuralcompose yet)."""
+    import json
+
+    con = sqlite3.connect(copy_path)
+    rows = con.execute(
+        "SELECT record_digest, evidence_class, substr(claim, 1, 80), "
+        "coalesce(source_locator, ''), coalesce(occurred_at, '') FROM memories"
+    ).fetchall()
+    raw_edges = con.execute(
+        "SELECT src_digest, dst_digest, edge_kind FROM provenance_edges"
+    ).fetchall()
+    con.close()
+
+    info = {d: (cls, prefix, loc, occ) for d, cls, prefix, loc, occ in rows}
+    seeds = {
+        d for d, (_c, _p, loc, occ) in info.items()
+        if session_id in loc
+        or (utc_range and occ and utc_range[0] <= occ <= utc_range[1])
+    }
+    neighbours = {x for s, d, _ in raw_edges if s in seeds or d in seeds for x in (s, d)}
+    keep = (seeds | neighbours) & set(info)
+    sub_edges = [(s, d, k) for s, d, k in raw_edges if s in keep and d in keep]
+
+    nodes = {d: info[d][0] for d in keep}
+    pos, _n_comps, _loners = layout(nodes, sub_edges) if keep else ({}, 0, [])
+    order = sorted(keep)
+    idx = {d: i for i, d in enumerate(order)}
+    meta = {
+        "session_id": session_id,
+        "utc_range": utc_range,
+        "db_copy_sha256": sha,
+        "snapshot_utc": ts,
+        "store_counts": {"memories": len(rows), "edge_rows": len(raw_edges)},
+        "seed_count": len(seeds & keep),
+        "tool": "graph3d.py export v1",
+    }
+    np.savez(
+        out_path,
+        positions=np.array([pos[d] for d in order]) if order else np.zeros((0, 3)),
+        digests=np.array(order),
+        evidence_class=np.array([info[d][0] for d in order]),
+        claim_prefixes=np.array([info[d][1] for d in order]),
+        edges=np.array([[idx[s], idx[d]] for s, d, _ in sub_edges], dtype=np.int64).reshape(-1, 2),
+        edge_kinds=np.array([k for _s, _d, k in sub_edges]),
+        seed_mask=np.array([d in seeds for d in order], dtype=bool),
+        meta_json=json.dumps(meta),
+    )
+    print(f"wrote {out_path}: {len(order)} nodes ({meta['seed_count']} session-created), "
+          f"{len(sub_edges)} edges, session_id={session_id}")
+
+
 FIXTURE_SCHEMA = """
 CREATE TABLE memories (record_digest TEXT PRIMARY KEY, claim TEXT,
-  evidence_class TEXT, occurred_at TEXT);
+  evidence_class TEXT, occurred_at TEXT, source_locator TEXT);
 CREATE TABLE provenance_edges (src_digest TEXT, dst_digest TEXT,
   edge_kind TEXT, created_at TEXT);
 """
@@ -224,10 +280,10 @@ def self_check():
     os.close(fd)
     con = sqlite3.connect(db)
     con.executescript(FIXTURE_SCHEMA)
-    rows = [(a, "claim a", "observed"), (b, "claim b", "agentInference"),
-            (c, "claim c", "externalClaim"), (d, "claim d", "humanDecision"),
-            (e, "claim e", "derivedDeterministically"), (f, "claim f", "observed")]
-    con.executemany("INSERT INTO memories VALUES (?,?,?,'2026-01-01')", rows)
+    rows = [(a, "claim a", "observed", "session-x log"), (b, "claim b", "agentInference", ""),
+            (c, "claim c", "externalClaim", ""), (d, "claim d", "humanDecision", ""),
+            (e, "claim e", "derivedDeterministically", ""), (f, "claim f", "observed", "")]
+    con.executemany("INSERT INTO memories VALUES (?,?,?,'2026-01-01',?)", rows)
     con.executemany("INSERT INTO provenance_edges VALUES (?,?,?,'2026-01-01')",
                     [(a, b, "supports"), (b, c, "contradicts"), (d, e, "derivedFrom")])
     con.commit()
@@ -246,6 +302,20 @@ def self_check():
             assert stats["nodes"] == 6 and stats["edges_drawn"] == 3 and stats["dangling"] == 0, stats
             assert os.path.getsize(png) > 0
             os.unlink(png)
+            # session-scoped export: seed a (locator match) + 1-hop neighbour b, edge a->b
+            fd3, npz = tempfile.mkstemp(prefix="graph3d-fixture-", suffix=".npz")
+            os.close(fd3)
+            export_npz(copy, sha, ts, "session-x", None, npz)
+            d_np = np.load(npz)
+            assert sorted(d_np["digests"]) == sorted([a, b]), d_np["digests"]
+            assert int(d_np["seed_mask"].sum()) == 1
+            assert d_np["edges"].shape == (1, 2) and d_np["edge_kinds"][0] == "supports"
+            assert d_np["positions"].shape == (2, 3)
+            # unmatched session -> empty artifact, not an error
+            export_npz(copy, sha, ts, "session-nope", None, npz)
+            d_np = np.load(npz)
+            assert len(d_np["digests"]) == 0 and d_np["positions"].shape == (0, 3)
+            os.unlink(npz)
         finally:
             os.unlink(copy)
     finally:
@@ -258,6 +328,11 @@ def main():
     ap.add_argument("--db", default=DEFAULT_DB)
     ap.add_argument("--screenshot", metavar="OUT.png")
     ap.add_argument("--self-check", action="store_true")
+    ap.add_argument("--export", metavar="OUT.npz",
+                    help="write the session-scoped neighbourhood artifact, no render")
+    ap.add_argument("--session-id", help="required with --export")
+    ap.add_argument("--utc-start", help="optional occurred_at range start (ISO, with --export)")
+    ap.add_argument("--utc-end", help="optional occurred_at range end (ISO, with --export)")
     args = ap.parse_args()
 
     if args.self_check:
@@ -266,6 +341,12 @@ def main():
 
     copy, sha, ts = snapshot(args.db)
     try:
+        if args.export:
+            if not args.session_id:
+                sys.exit("--export requires --session-id")
+            utc_range = [args.utc_start, args.utc_end] if args.utc_start and args.utc_end else None
+            export_npz(copy, sha, ts, args.session_id, utc_range, args.export)
+            return
         nodes, edges, dangling, edge_refd = load(copy)
         stats = render(nodes, edges, dangling, edge_refd, sha, ts, screenshot=args.screenshot)
     finally:
