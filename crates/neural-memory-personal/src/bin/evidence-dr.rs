@@ -1,0 +1,133 @@
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::process::ExitCode;
+
+use neural_memory_personal::evidence_dr::{
+    accept, read_current, stage, EvidenceManifestV1, SignedEvidenceManifestV1, StageConfig,
+    ARTIFACT_NAME, MANIFEST_NAME, SIGNATURE_NAME,
+};
+use neural_memory_personal::runtime::{decode_verifying_key, load_or_create_signing_key};
+use serde_json::json;
+
+fn env_path(name: &str) -> Result<PathBuf, String> {
+    std::env::var(name)
+        .map(PathBuf::from)
+        .map_err(|_| format!("{name} is required"))
+}
+
+fn root() -> Result<PathBuf, String> {
+    let root = env_path("NEURAL_MEMORY_EVIDENCE_DR_DIR")?;
+    if root != Path::new("/srv/neural-memory-data/backups/evidence-dr") {
+        return Err("DR directory must be /srv/neural-memory-data/backups/evidence-dr".into());
+    }
+    Ok(root)
+}
+
+fn exact_value<'a>(args: &'a [String], flag: &str) -> Result<&'a str, String> {
+    if args.len() != 2 || args[0] != flag {
+        return Err(format!("expected {flag} VALUE"));
+    }
+    Ok(&args[1])
+}
+
+fn run() -> Result<(), String> {
+    let args: Vec<String> = std::env::args().skip(1).collect();
+    let (command, rest) = args.split_first().ok_or("command required")?;
+    let root = root()?;
+    match command.as_str() {
+        "stage" => {
+            if rest.len() != 3 || rest[0] != "--writers-stopped" || rest[1] != "--created-at" {
+                return Err("expected stage --writers-stopped --created-at TIMESTAMP".into());
+            }
+            if std::env::var("NEURAL_MEMORY_EVIDENCE_WRITERS_STOPPED").as_deref() != Ok("1") {
+                return Err("writer-stop environment gate is not set".into());
+            }
+            let source = env_path("NEURAL_MEMORY_EVIDENCE_SOURCE")?;
+            if source != Path::new("/srv/neural-memory-data/evidence/store.db") {
+                return Err(
+                    "evidence source must be /srv/neural-memory-data/evidence/store.db".into(),
+                );
+            }
+            let admin = env_path("NEURAL_MEMORY_EVIDENCE_ADMIN")?;
+            if admin != Path::new("/usr/local/bin/neural-memory-admin") {
+                return Err("evidence admin must be /usr/local/bin/neural-memory-admin".into());
+            }
+            let users = Command::new("fuser")
+                .arg(&source)
+                .status()
+                .map_err(|error| format!("cannot check evidence writers: {error}"))?;
+            match users.code() {
+                Some(1) => {}
+                Some(0) => return Err("evidence source still has open users".into()),
+                _ => return Err("evidence writer preflight failed".into()),
+            }
+            let key_path = env_path("NEURAL_MEMORY_PERSONAL_KEY")?;
+            if key_path != Path::new("/srv/neural-memory-data/keys/gpd-ed25519.seed") {
+                return Err(
+                    "signing key must be /srv/neural-memory-data/keys/gpd-ed25519.seed".into(),
+                );
+            }
+            let key = load_or_create_signing_key(&key_path)?;
+            let manifest = stage(&StageConfig {
+                root: &root,
+                source: &source,
+                admin: &admin,
+                created_at: &rest[2],
+                signing_key: &key,
+            })?;
+            println!(
+                "{}",
+                serde_json::to_string(&manifest).map_err(|error| error.to_string())?
+            );
+        }
+        "accept" => {
+            let trusted = decode_verifying_key(exact_value(rest, "--trusted-key-base64")?)?;
+            let manifest = accept(&root, &trusted)?;
+            println!(
+                "{}",
+                serde_json::to_string(&json!({"accepted":manifest}))
+                    .map_err(|error| error.to_string())?
+            );
+        }
+        "list" if rest.is_empty() => {
+            let manifest: EvidenceManifestV1 =
+                serde_json::from_slice(&read_current(&root, MANIFEST_NAME)?)
+                    .map_err(|error| error.to_string())?;
+            let signature: SignedEvidenceManifestV1 =
+                serde_json::from_slice(&read_current(&root, SIGNATURE_NAME)?)
+                    .map_err(|error| error.to_string())?;
+            println!(
+                "{}",
+                serde_json::to_string(&json!({"manifest":manifest,"signature":signature}))
+                    .map_err(|error| error.to_string())?
+            );
+        }
+        "stream" => {
+            if rest.len() != 1 {
+                return Err("expected stream backup|manifest|signature".into());
+            }
+            let name = match rest[0].as_str() {
+                "backup" => ARTIFACT_NAME,
+                "manifest" => MANIFEST_NAME,
+                "signature" => SIGNATURE_NAME,
+                _ => return Err("artifact must be backup, manifest, or signature".into()),
+            };
+            std::io::stdout()
+                .write_all(&read_current(&root, name)?)
+                .map_err(|error| error.to_string())?;
+        }
+        _ => return Err("unknown or malformed DR command".into()),
+    }
+    Ok(())
+}
+
+fn main() -> ExitCode {
+    match run() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("evidence DR command rejected: {error}");
+            ExitCode::from(2)
+        }
+    }
+}
