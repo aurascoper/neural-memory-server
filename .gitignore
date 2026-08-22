@@ -13,3 +13,6 @@
 *.swp
 *~
 .DS_Store
+
+# Subagent transcripts and scratch (tool cache, not source)
+/.pi-subagents/

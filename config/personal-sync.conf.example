@@ -1,0 +1,7 @@
+# Install exactly as root:neural-memory mode 0640 at
+# /etc/neural-memory/personal-sync.conf. The wrapper rejects other metadata.
+NEURAL_MEMORY_PERSONAL_SYNC_BIN=/usr/local/bin/neural-memory-personal-sync
+NEURAL_MEMORY_PERSONAL_DB=/srv/neural-memory-data/personal/personal.db
+NEURAL_MEMORY_PERSONAL_KEY=/srv/neural-memory-data/keys/gpd-ed25519.seed
+NEURAL_MEMORY_MAC_PUBLIC_KEY=/srv/neural-memory-data/keys/mac-ed25519.pub
+NEURAL_MEMORY_PERSONAL_DEVICE=gpd-win-mini

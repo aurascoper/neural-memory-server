@@ -1,0 +1,4 @@
+# Install exactly as root:neural-memory mode 0640 at
+# /etc/neural-memory/evidence-dr-pull.conf. The wrapper rejects other metadata.
+NEURAL_MEMORY_EVIDENCE_DR_BIN=/usr/local/bin/neural-memory-evidence-dr
+NEURAL_MEMORY_EVIDENCE_DR_DIR=/srv/neural-memory-data/backups/evidence-dr

@@ -1,0 +1,36 @@
+{
+  "version": "EmbeddingProvenanceV1",
+  "llamaCpp": {
+    "sourceRepository": "https://github.com/ggml-org/llama.cpp.git",
+    "sourceCommit": "d0bfb1981266c271cd0536a8aa7c5e863e7cdf61",
+    "buildNumber": 10188,
+    "reportedShortCommit": "d0bfb1981",
+    "toolchain": {
+      "cxx": "/usr/bin/c++ (GCC 15.2.0)",
+      "cmake": "4.2.3"
+    },
+    "buildFlags": {
+      "CMAKE_BUILD_TYPE": "Release",
+      "GGML_BLAS": "OFF",
+      "GGML_CPU": "ON",
+      "GGML_CPU_REPACK": "ON",
+      "GGML_NATIVE": "ON",
+      "GGML_OPENMP": "ON"
+    }
+  },
+  "model": {
+    "upstreamRepository": "https://huggingface.co/nomic-ai/nomic-embed-text-v1.5-GGUF",
+    "upstreamRevision": "18d1044f4866e224159fce8c6fc5c4f3920176e7",
+    "artifactFilename": "nomic-embed-text-v1.5.Q8_0.gguf",
+    "artifactBytes": 146146432,
+    "artifactSha256": "3e24342164b3d94991ba9692fdc0dd08e3fd7362e0aacc396a9a5c54a544c3b7",
+    "artifactDeclaredTrainingContext": 2048
+  },
+  "runtimeArtifacts": {
+    "serverFilename": "llama-server",
+    "serverBytes": 17904,
+    "serverSha256": "bd95aacd01abd53a2eed1a08c3e37f808d1760e7161ca7f5520a452ff81c0fe2",
+    "libraryManifestFilename": "llama-cpu-runtime-v1.manifest",
+    "libraryManifestSha256": "5bfd7debb88b50edc1748e8284fb2bf676ffc7dc18b2dd27582059566f98c7ac"
+  }
+}

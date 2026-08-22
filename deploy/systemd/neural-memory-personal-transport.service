@@ -1,0 +1,22 @@
+[Unit]
+Description=Authenticated personal sync transport
+RequiresMountsFor=/srv/neural-memory-data
+ConditionPathIsMountPoint=/srv/neural-memory-data
+After=local-fs.target network-online.target
+
+[Service]
+Type=simple
+User=neural-memory
+Group=neural-memory
+UMask=0077
+ExecStart=/usr/local/bin/neural-memory-personal-transport --listen 127.0.0.1:9443 --db /srv/neural-memory-data/personal/personal.db --key /srv/neural-memory-data/keys/gpd-ed25519.seed --peer-key /srv/neural-memory-data/keys/mac-ed25519.pub --token-file /srv/neural-memory-data/keys/personal-transport.token --device gpd-win-mini
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/neural-memory-data/personal /srv/neural-memory-data/outboxes /srv/neural-memory-data/keys /srv/neural-memory-data/sqlite-tmp
+NoNewPrivileges=true
+IPAddressDeny=any
+IPAddressAllow=localhost
+
+[Install]
+WantedBy=multi-user.target

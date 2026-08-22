@@ -1,0 +1,26 @@
+[Unit]
+Description=Loopback CPU personal-memory embedding server
+After=local-fs.target
+
+[Service]
+Type=simple
+User=neural-memory
+Group=neural-memory
+UMask=0077
+Environment=LD_LIBRARY_PATH=/usr/local/lib/neural-memory/llama-cpu
+ExecStartPre=/usr/local/libexec/neural-memory-verify-llama-runtime-v1
+ExecStartPre=/usr/local/libexec/neural-memory-verify-embedding-model-v1
+ExecStart=/usr/local/bin/llama-server --model /usr/local/share/neural-memory/models/nomic-embed-text-v1.5.Q8_0.gguf --host 127.0.0.1 --port 8082 --embeddings --pooling mean --ctx-size 2048 --batch-size 2048 --ubatch-size 2048 --parallel 1 --n-gpu-layers 0
+ExecStartPost=/usr/local/libexec/neural-memory-wait-embedding-ready-v1
+Restart=on-failure
+RestartSec=5s
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+NoNewPrivileges=true
+IPAddressDeny=any
+IPAddressAllow=localhost
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

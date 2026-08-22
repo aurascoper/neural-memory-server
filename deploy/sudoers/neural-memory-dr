@@ -1,0 +1,3 @@
+Defaults:neural-memory-dr env_reset
+Defaults!/usr/local/libexec/evidence-dr-forced-command-v1 env_keep += "SSH_ORIGINAL_COMMAND"
+neural-memory-dr ALL=(neural-memory) NOPASSWD: /usr/local/libexec/evidence-dr-forced-command-v1 ""

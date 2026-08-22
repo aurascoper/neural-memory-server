@@ -1,0 +1,16 @@
+{
+  "version": "ed25519-v1",
+  "messageBase64": "Y3Jvc3MtbGFuZ3VhZ2Utc3luYy12MQ==",
+  "publicKeyBase64": "A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=",
+  "validSignatureBase64": "moErLA+4FFJ7wBD6paCun6gCPtFWb8DyRFnhyepv1lBWD/KqDWbvYLL1S8w2N93exGBoR0+A7xvCTdjeiPT6Cg==",
+  "rejections": [
+    {
+      "name": "noncanonical-s-equals-group-order",
+      "signatureBase64": "moErLA+4FFJ7wBD6paCun6gCPtFWb8DyRFnhyepv1lDt0/VcGmMSWNac96Le+d4UAAAAAAAAAAAAAAAAAAAAEA=="
+    },
+    {
+      "name": "small-order-zero-point",
+      "signatureBase64": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=="
+    }
+  ]
+}

@@ -1,0 +1,3 @@
+Defaults:neural-memory-sync env_reset
+Defaults!/usr/local/libexec/personal-sync-forced-command-v1 env_keep += "SSH_ORIGINAL_COMMAND"
+neural-memory-sync ALL=(neural-memory) NOPASSWD: /usr/local/libexec/personal-sync-forced-command-v1 ""

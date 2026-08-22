@@ -1,0 +1,21 @@
+[Unit]
+Description=Bounded local personal-memory embedding worker
+Requires=neural-memory-embedding-server.service
+After=neural-memory-embedding-server.service
+RequiresMountsFor=/srv/neural-memory-data
+ConditionPathIsMountPoint=/srv/neural-memory-data
+
+[Service]
+Type=oneshot
+User=neural-memory
+Group=neural-memory
+UMask=0077
+ExecStart=/usr/local/libexec/neural-memory-embedding-worker-v1
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/neural-memory-data/personal /srv/neural-memory-data/sqlite-tmp
+NoNewPrivileges=true
+IPAddressDeny=any
+IPAddressAllow=localhost
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6

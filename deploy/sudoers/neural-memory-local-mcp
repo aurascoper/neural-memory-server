@@ -1,0 +1,2 @@
+aurascoper ALL=(neural-memory) NOPASSWD: /usr/local/libexec/neural-memory-personal-mcp-v1 ""
+aurascoper ALL=(neural-memory) NOPASSWD: /usr/local/libexec/neural-memory-evidence-mcp-v1 ""

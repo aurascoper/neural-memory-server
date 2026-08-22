@@ -1,0 +1,11 @@
+[Unit]
+Description=Periodically drain bounded personal-memory embedding work
+
+[Timer]
+OnBootSec=2m
+OnUnitActiveSec=1m
+Persistent=true
+Unit=neural-memory-embedding-worker.service
+
+[Install]
+WantedBy=timers.target
