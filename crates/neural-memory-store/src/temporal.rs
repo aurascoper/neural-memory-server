@@ -143,6 +143,69 @@ impl Store {
         Ok(out)
     }
 
+    /// Which rules were IN FORCE at a point in transaction time.
+    ///
+    /// This is the query the whole standing mechanism exists for. A rule that
+    /// lived in a plan file could not answer "was this in force on the 28th",
+    /// so when the failure it prevents recurred there was no way to tell
+    /// whether the rule had been binding and ignored, or simply not binding.
+    /// `seq_at(instant)` resolves the date; this resolves the rules.
+    ///
+    /// Same three-clause predicate as `current_as_of`, plus the standing
+    /// window. It cannot use the `standing_current` view — the view is about
+    /// NOW, and its retirement test is `superseded_at IS NULL`, a wall-clock
+    /// column with no sequence to compare against. Point-in-time needs the
+    /// `_seq` columns 0003 added, which is what they were added for.
+    ///
+    /// Ordered by `standing_seq`, not `recorded_seq`: declaration order is
+    /// emission order, so the block appends rather than reshuffling.
+    pub fn standing_as_of(&self, seq: i64) -> Result<Vec<TimelineEntry>, StoreError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT recorded_seq, record_digest, claim, evidence_class,
+                    recorded_at, occurred_at, superseded_seq, superseded_by
+             FROM memories
+             WHERE standing_seq IS NOT NULL
+               AND standing_seq <= ?1
+               AND (superseded_seq IS NULL OR superseded_seq > ?1)
+               AND (retracted_seq  IS NULL OR retracted_seq  > ?1)
+             ORDER BY standing_seq, recorded_seq",
+        )?;
+        let rows = stmt.query_map(params![seq], |r| {
+            Ok(TimelineEntry {
+                recorded_seq: r.get(0)?,
+                record_digest: r.get(1)?,
+                claim: r.get(2)?,
+                evidence_class: r.get(3)?,
+                recorded_at: r.get(4)?,
+                occurred_at: r.get(5)?,
+                superseded_seq: r.get(6)?,
+                superseded_by: r.get(7)?,
+            })
+        })?;
+        let mut out = Vec::new();
+        for x in rows {
+            out.push(x?);
+        }
+        Ok(out)
+    }
+
+    /// The rules in force NOW, read through the view so the retirement
+    /// predicate has exactly one definition.
+    ///
+    /// Distinct from `standing_as_of(max_seq)` on purpose: this is what the
+    /// session hook injects, and it must not depend on resolving an instant.
+    pub fn standing_in_force(&self) -> Result<Vec<(String, String)>, StoreError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT record_digest, claim FROM standing_current")?;
+        let rows = stmt.query_map([], |r| Ok((r.get(0)?, r.get(1)?)))?;
+        let mut out = Vec::new();
+        for x in rows {
+            out.push(x?);
+        }
+        Ok(out)
+    }
+
     /// Q3: was the evidence this claim cites already retired when it was made?
     ///
     /// A claim resting on evidence retired *before* it existed is a defect. One

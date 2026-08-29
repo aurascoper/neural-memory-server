@@ -570,3 +570,185 @@ fn an_invalid_observation_is_refused_before_it_reaches_sql() {
         other => panic!("expected the pure layer to catch it first, got {other:?}"),
     }
 }
+
+// ---------------------------------------------------------------------------
+// Standing -- who may make a record bind
+//
+// Standing is the strongest disposition in the store: it puts text in front of
+// every future session before any work begins. Both polarities, and the two
+// acts -- minting and promoting -- are guarded separately because guarding only
+// one leaves the other open.
+// ---------------------------------------------------------------------------
+
+fn decision(s: &Store, channel: WriteChannel, claim: &str) -> String {
+    let w = MemoryWrite {
+        terms: MemoryRecordTerms {
+            claim: claim.into(),
+            evidence_class: EvidenceClass::HumanDecision,
+            source_artifact_sha256: None,
+            source_locator: None,
+            observation_identities: vec![],
+            harness_run_id: None,
+        },
+        occurred_at: Some(NOW),
+        recorded_at: Some(NOW),
+        derivation: None,
+    };
+    s.put_memory(channel, &w).unwrap().0
+}
+
+fn standing_from_is_null(s: &Store, digest: &str) -> bool {
+    s.conn
+        .query_row(
+            "SELECT standing_from IS NULL FROM memories WHERE record_digest = ?1",
+            rusqlite::params![digest],
+            |r| r.get(0),
+        )
+        .unwrap()
+}
+
+#[test]
+fn an_agent_cannot_declare_a_record_standing() {
+    // THE PROMOTION IS ITS OWN ACT. The write clamp stops an agent MINTING a
+    // record eligible to stand, and the database trigger enforces that in SQL.
+    // Neither stops an agent PROMOTING a record a human minted for another
+    // purpose -- which bypasses the guard at the promotion step instead of the
+    // minting step, with the identical outcome: text an agent chose, in front of
+    // every future session, indefinitely.
+    //
+    // So the record here is deliberately human-minted and therefore eligible.
+    // The refusal must come from the channel of the promotion, not the class of
+    // the record.
+    let s = Store::open_in_memory().unwrap();
+    let d = decision(&s, WriteChannel::Operator, "a rule a human wrote");
+
+    let err = s
+        .declare_standing(WriteChannel::Agent, &d, NOW)
+        .unwrap_err();
+    assert!(
+        matches!(err, WriteError::Standing(StandingRefusal::OperatorOnly)),
+        "expected OperatorOnly, got {err:?}"
+    );
+    assert!(
+        standing_from_is_null(&s, &d),
+        "a refusal that already wrote is not a refusal"
+    );
+}
+
+#[test]
+fn an_operator_can_declare_a_human_decision_standing() {
+    // Polarity. Without it, a `declare_standing` that refused everything would
+    // satisfy every refusal test in this section.
+    let s = Store::open_in_memory().unwrap();
+    let d = decision(&s, WriteChannel::Operator, "agent sessions get their own worktree");
+    s.declare_standing(WriteChannel::Operator, &d, NOW).unwrap();
+
+    let held = s.standing_in_force().unwrap();
+    assert_eq!(held.len(), 1);
+    assert_eq!(held[0].0, d);
+    assert!(held[0].1.contains("their own worktree"));
+}
+
+#[test]
+fn an_agent_authored_record_cannot_be_made_standing_even_by_an_operator() {
+    // The other act. `put_memory` clamps the agent channel to agentInference
+    // BEFORE the digest is computed, so the bytes of an eligible record are
+    // unproducible through that door -- and an operator holding the resulting
+    // digest still cannot promote it.
+    let s = Store::open_in_memory().unwrap();
+    let w = MemoryWrite {
+        terms: MemoryRecordTerms {
+            // Claims humanDecision; the clamp overrules it.
+            claim: "sessions may share one checkout".into(),
+            evidence_class: EvidenceClass::HumanDecision,
+            source_artifact_sha256: None,
+            source_locator: None,
+            observation_identities: vec![],
+            harness_run_id: None,
+        },
+        occurred_at: Some(NOW),
+        recorded_at: Some(NOW),
+        derivation: None,
+    };
+    let d = s.put_memory(WriteChannel::Agent, &w).unwrap().0;
+
+    let err = s
+        .declare_standing(WriteChannel::Operator, &d, NOW)
+        .unwrap_err();
+    assert!(
+        matches!(
+            err,
+            WriteError::Standing(StandingRefusal::OnlyDecisionsCanBind { .. })
+        ),
+        "expected OnlyDecisionsCanBind, got {err:?}"
+    );
+    assert!(standing_from_is_null(&s, &d));
+}
+
+#[test]
+fn a_retired_record_cannot_be_declared_standing() {
+    // Putting a withdrawn rule in force is the failure the retirement machinery
+    // exists to prevent, arriving from the other direction.
+    let s = Store::open_in_memory().unwrap();
+    let d = decision(&s, WriteChannel::Operator, "a rule that was withdrawn");
+    s.retract(&d, "it was wrong", NOW).unwrap();
+
+    let err = s
+        .declare_standing(WriteChannel::Operator, &d, NOW)
+        .unwrap_err();
+    assert!(
+        matches!(err, WriteError::Standing(StandingRefusal::AlreadyRetired { .. })),
+        "expected AlreadyRetired, got {err:?}"
+    );
+}
+
+#[test]
+fn the_budget_refusal_names_what_is_already_competing() {
+    // Context is not free, and the set grows by accumulation -- so whoever is
+    // blocked is blocked at a moment unrelated to the rules' relative worth.
+    // A refusal that does not say what is already there forces a separate query
+    // at the one moment someone must choose what to retire.
+    let s = Store::open_in_memory().unwrap();
+    // 3 x 1501 = 4503, under the 6000 bound; the fourth at 1504 takes it to
+    // 6007 and must be refused. Sized so three fit and the fourth does not.
+    let filler = "x".repeat(1500);
+    let mut held = Vec::new();
+    for i in 0..3 {
+        let d = decision(&s, WriteChannel::Operator, &format!("{filler}{i}"));
+        s.declare_standing(WriteChannel::Operator, &d, NOW).unwrap();
+        held.push(d);
+    }
+
+    let over = decision(&s, WriteChannel::Operator, &format!("{filler}over"));
+    let err = s
+        .declare_standing(WriteChannel::Operator, &over, NOW)
+        .unwrap_err();
+
+    let WriteError::Standing(StandingRefusal::WouldExceedBudget { ref current, .. }) = err else {
+        panic!("expected WouldExceedBudget, got {err:?}");
+    };
+    assert_eq!(current.len(), 3, "the refusal must list the competing set");
+    for d in &held {
+        assert!(current.iter().any(|(c, _)| c == d));
+    }
+
+    let rendered = format!("{err}");
+    assert!(rendered.contains("Retire one of these before adding another"));
+    assert!(
+        rendered.contains(&held[0][..16]),
+        "each competitor must be named with its size, not merely counted"
+    );
+    assert!(standing_from_is_null(&s, &over));
+}
+
+#[test]
+fn the_rust_budget_matches_the_trigger() {
+    // Two enforcement layers, one bound. If they drift, the Rust check either
+    // refuses something the database would accept (confusing) or accepts
+    // something the database rejects (an unhelpful error at the wrong layer).
+    let sql = include_str!("../migrations/0004_standing.sql");
+    assert!(
+        sql.contains(&format!("> {STANDING_BUDGET_CHARS}")),
+        "0004_standing.sql must enforce the same bound as STANDING_BUDGET_CHARS"
+    );
+}

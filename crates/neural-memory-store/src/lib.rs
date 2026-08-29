@@ -28,7 +28,10 @@ pub use retrieval::{
 };
 pub use temporal::{BeliefAt, SeqAt, TimelineEntry};
 pub use vector::{VectorError, VectorHit};
-pub use write::{EvidenceRefusal, MemoryWrite, WriteChannel, WriteError, Wrote};
+pub use write::{
+    EvidenceRefusal, MemoryWrite, StandingRefusal, WriteChannel, WriteError, Wrote,
+    STANDING_BUDGET_CHARS,
+};
 
 #[derive(Debug)]
 pub enum StoreError {

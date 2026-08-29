@@ -21,6 +21,11 @@ use neural_memory_domain::{
 use rusqlite::{params, OptionalExtension};
 
 use crate::derive::{Derivation, DerivationError};
+
+/// Mirror of the bound in `0004_standing.sql`. The trigger is authoritative —
+/// this exists so the refusal can be informative, and
+/// `the_rust_budget_matches_the_trigger` fails if they drift apart.
+pub const STANDING_BUDGET_CHARS: usize = 6000;
 use crate::{Store, StoreError};
 
 /// Which door a write came through.
@@ -55,6 +60,84 @@ pub enum WriteError {
     Sql(rusqlite::Error),
     Observation(Vec<ObservationDefect>),
     Evidence(EvidenceRefusal),
+    Standing(StandingRefusal),
+}
+
+/// Why a record was refused the standing disposition.
+///
+/// Separate from `EvidenceRefusal` because these are not claims about how
+/// something came to be believed -- they are claims about who may make a record
+/// bind, and what it costs.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum StandingRefusal {
+    /// The promotion itself must be a human act.
+    ///
+    /// The database trigger checks `evidence_class = 'humanDecision'`, which
+    /// stops an agent promoting a record it MINTED. It does not stop an agent
+    /// promoting a record a HUMAN minted for some other purpose -- that would
+    /// bypass the guard at the promotion step rather than the minting step, and
+    /// the result is the same: text an agent chose, in front of every future
+    /// session. Minting and promoting are two acts and both must be human.
+    OperatorOnly,
+    NoSuchRecord {
+        digest: String,
+    },
+    /// Only a decision may bind. A measurement is not a rule and arithmetic is
+    /// not a rule.
+    OnlyDecisionsCanBind {
+        evidence_class: String,
+    },
+    /// Declaring a retired record standing would put a withdrawn rule in force.
+    AlreadyRetired {
+        digest: String,
+    },
+    /// Context is not free, and the refusal says what is already competing --
+    /// otherwise choosing what to retire needs a separate query at the one
+    /// moment someone must choose.
+    WouldExceedBudget {
+        current: Vec<(String, usize)>,
+        adding: usize,
+        limit: usize,
+    },
+}
+
+impl std::fmt::Display for StandingRefusal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StandingRefusal::OperatorOnly => write!(
+                f,
+                "declaring a record standing is an operator action: it puts text \
+                 in front of every future session before any work begins"
+            ),
+            StandingRefusal::NoSuchRecord { digest } => {
+                write!(f, "no record {digest}")
+            }
+            StandingRefusal::OnlyDecisionsCanBind { evidence_class } => write!(
+                f,
+                "only a humanDecision may stand, this record is {evidence_class}: \
+                 a measurement is not a rule and arithmetic is not a rule"
+            ),
+            StandingRefusal::AlreadyRetired { digest } => {
+                write!(f, "record {digest} is retired; a withdrawn rule may not bind")
+            }
+            StandingRefusal::WouldExceedBudget {
+                current,
+                adding,
+                limit,
+            } => {
+                let used: usize = current.iter().map(|(_, n)| n).sum();
+                writeln!(
+                    f,
+                    "standing set would exceed its budget: {used} + {adding} > {limit} chars.\n\
+                     Retire one of these before adding another:"
+                )?;
+                for (digest, n) in current {
+                    writeln!(f, "  {:>5}  {}", n, &digest[..16.min(digest.len())])?;
+                }
+                write!(f, "  {used:>5}  total")
+            }
+        }
+    }
 }
 
 /// Why a claimed evidence class was refused.
@@ -86,6 +169,7 @@ impl std::fmt::Display for WriteError {
             WriteError::Sql(e) => write!(f, "sqlite: {e}"),
             WriteError::Observation(d) => write!(f, "invalid observation: {d:?}"),
             WriteError::Evidence(r) => write!(f, "evidence refused: {r:?}"),
+            WriteError::Standing(r) => write!(f, "standing refused: {r}"),
         }
     }
 }
@@ -427,6 +511,86 @@ impl Store {
         tx_conn.execute(
             "INSERT OR IGNORE INTO provenance_edges VALUES (?1,?2,'supersedes',?3)",
             params![replacement, retired, at],
+        )?;
+        Ok(())
+    }
+
+    /// Declare a record standing: in force, injected before any session works.
+    ///
+    /// TWO ACTS, BOTH HUMAN. `write.rs` already clamps the agent channel to
+    /// `AgentInference` before a digest exists, so an agent cannot MINT a record
+    /// eligible to stand, and the database trigger enforces that at the SQL
+    /// layer. Neither stops an agent PROMOTING a record a human minted for some
+    /// other purpose — that bypasses the guard at the promotion step instead of
+    /// the minting step, and the outcome is identical: text an agent chose, in
+    /// front of every future session, indefinitely. So the channel is checked
+    /// here, first, before anything is read.
+    ///
+    /// The trigger is the layer that cannot be routed around; this is the layer
+    /// that says why, and — for the budget — what is already competing.
+    pub fn declare_standing(
+        &self,
+        channel: WriteChannel,
+        digest: &str,
+        at: &str,
+    ) -> Result<(), WriteError> {
+        if channel == WriteChannel::Agent {
+            return Err(WriteError::Standing(StandingRefusal::OperatorOnly));
+        }
+
+        let row: Option<(String, Option<String>, Option<String>, usize)> = self
+            .conn
+            .query_row(
+                "SELECT evidence_class, superseded_at, retracted_at, length(claim)
+                   FROM memories WHERE record_digest = ?1",
+                params![digest],
+                |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get::<_, i64>(3)? as usize)),
+            )
+            .optional()?;
+        let Some((class, superseded, retracted, claim_len)) = row else {
+            return Err(WriteError::Standing(StandingRefusal::NoSuchRecord {
+                digest: digest.to_string(),
+            }));
+        };
+        if class != "humanDecision" {
+            return Err(WriteError::Standing(StandingRefusal::OnlyDecisionsCanBind {
+                evidence_class: class,
+            }));
+        }
+        if superseded.is_some() || retracted.is_some() {
+            return Err(WriteError::Standing(StandingRefusal::AlreadyRetired {
+                digest: digest.to_string(),
+            }));
+        }
+
+        // Budget, re-checked here so the refusal can name what is competing.
+        // The trigger enforces the same bound and is what makes it unbypassable.
+        let mut stmt = self
+            .conn
+            .prepare("SELECT record_digest, length(claim) FROM standing_current")?;
+        let current: Vec<(String, usize)> = stmt
+            .query_map([], |r| Ok((r.get(0)?, r.get::<_, i64>(1)? as usize)))?
+            .collect::<Result<_, _>>()?;
+        let used: usize = current.iter().map(|(_, n)| n).sum();
+        if used + claim_len > STANDING_BUDGET_CHARS {
+            return Err(WriteError::Standing(StandingRefusal::WouldExceedBudget {
+                current,
+                adding: claim_len,
+                limit: STANDING_BUDGET_CHARS,
+            }));
+        }
+
+        // Same watermark reasoning as `supersede` and `retract`: the declaration
+        // happens NOW in transaction order.
+        let now_seq: i64 = self.conn.query_row(
+            "SELECT coalesce(max(recorded_seq), 0) FROM memories",
+            [],
+            |r| r.get(0),
+        )?;
+        self.conn.execute(
+            "UPDATE memories SET standing_from = ?2, standing_seq = ?3
+             WHERE record_digest = ?1",
+            params![digest, at, now_seq],
         )?;
         Ok(())
     }
