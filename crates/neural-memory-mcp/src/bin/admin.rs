@@ -65,13 +65,21 @@ const COMMANDS: &[(&str, Access)] = &[
     ("declare-standing", Access::Rw),
     // The first Ro command, and the reason the access column exists.
     ("standing", Access::Ro),
-    // Both only read, and both should be Ro. Left Rw deliberately until that
-    // change lands on its own: `open_read_only` does not migrate, so a store
-    // older than this build would start erroring where it now silently upgrades.
-    // Classified here so the gap is visible in the data while it is open.
-    ("stats", Access::Rw),
+    // Read-only, now that the classification exists to say so. Both used to
+    // open read-write for no reason beyond a shared open at the top of run(),
+    // which meant `stats --db /typo` CREATED the store, migrated it, and printed
+    // memories=0 -- a true statement about a database it had just invented, and
+    // indistinguishable from a correct answer over a correct store.
+    //
+    // The behaviour change worth naming: `open_read_only` does not migrate, so a
+    // store older than this build now errors here instead of being silently
+    // upgraded by whoever happened to run `stats` first. Upgrading a store is a
+    // write, and a command classified read-only should not perform one.
+    ("stats", Access::Ro),
+    // Stays Rw: `backup` runs VACUUM INTO, and whether that works on a read-only
+    // connection is unverified. A backup path is not where to find out.
     ("backup", Access::Rw),
-    ("verify-backup", Access::Rw),
+    ("verify-backup", Access::Ro),
 ];
 
 fn access_of(cmd: &str) -> Option<Access> {
