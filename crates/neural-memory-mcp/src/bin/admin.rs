@@ -30,6 +30,11 @@ fn arg(m: &HashMap<String, String>, k: &str) -> Result<String, String> {
         .ok_or_else(|| format!("--{k} is required"))
 }
 
+/// Read-write open, for the commands that write.
+fn open_rw(m: &HashMap<String, String>) -> Result<Store, String> {
+    Store::open(&PathBuf::from(arg(m, "db")?)).map_err(|e| e.to_string())
+}
+
 fn main() -> ExitCode {
     let argv: Vec<String> = std::env::args().skip(1).collect();
     if argv.is_empty() {
@@ -67,11 +72,14 @@ fn main() -> ExitCode {
 }
 
 fn run(cmd: &str, m: &HashMap<String, String>) -> Result<String, String> {
-    let db = PathBuf::from(arg(m, "db")?);
-    let store = Store::open(&db).map_err(|e| e.to_string())?;
-
+    // The store is opened INSIDE each arm, not here. Two reasons, both
+    // load-bearing: a read-only command cannot be read-only if the open is
+    // shared with the writers, and an unknown command must reach the catch-all
+    // rather than failing first on `--db is required` -- which would make the
+    // dispatch test below assert nothing.
     match cmd {
         "record-artifact" => {
+            let store = open_rw(m)?;
             let a = ArtifactTerms {
                 artifact_kind: arg(m, "kind")?,
                 sha256_hex: arg(m, "sha256")?,
@@ -91,6 +99,7 @@ fn run(cmd: &str, m: &HashMap<String, String>) -> Result<String, String> {
         }
 
         "record-observation" => {
+            let store = open_rw(m)?;
             let suite = EvaluationSuiteTerms {
                 suite_name: arg(m, "suite")?,
                 case_digests: vec![arg(m, "case-digest")?],
@@ -166,6 +175,7 @@ fn run(cmd: &str, m: &HashMap<String, String>) -> Result<String, String> {
         }
 
         "record-decision" => {
+            let store = open_rw(m)?;
             let w = MemoryWrite {
                 terms: MemoryRecordTerms {
                     claim: arg(m, "claim")?,
@@ -186,6 +196,7 @@ fn run(cmd: &str, m: &HashMap<String, String>) -> Result<String, String> {
         }
 
         "supersede" => {
+            let store = open_rw(m)?;
             let retired = arg(m, "retired")?;
             let replacement = arg(m, "replacement")?;
             for d in [&retired, &replacement] {
@@ -200,6 +211,7 @@ fn run(cmd: &str, m: &HashMap<String, String>) -> Result<String, String> {
         }
 
         "stats" => {
+            let store = open_rw(m)?;
             let count = |t: &str| -> i64 {
                 store
                     .conn
@@ -225,6 +237,7 @@ fn run(cmd: &str, m: &HashMap<String, String>) -> Result<String, String> {
         // Verification runs by default and its failure is the command's failure.
         // A backup nobody checked is a guess about a file.
         "backup" => {
+            let store = open_rw(m)?;
             let to = PathBuf::from(arg(m, "to")?);
             let report = store.backup_to(&to).map_err(|e| e.to_string())?;
 
@@ -272,15 +285,16 @@ fn run(cmd: &str, m: &HashMap<String, String>) -> Result<String, String> {
 
         // Verify a backup taken earlier, without taking a new one.
         "verify-backup" => {
+            let store = open_rw(m)?;
             let of = PathBuf::from(arg(m, "of")?);
             let diffs = verify_replica(&store, &of).map_err(|e| e.to_string())?;
             if diffs.is_empty() {
-                Ok(format!("{} matches {} exactly", of.display(), db.display()))
+                Ok(format!("{} matches {} exactly", of.display(), arg(m, "db")?))
             } else {
                 Err(format!(
                     "{} differs from {} in {} way(s):\n  {}",
                     of.display(),
-                    db.display(),
+                    arg(m, "db")?,
                     diffs.len(),
                     diffs
                         .iter()
