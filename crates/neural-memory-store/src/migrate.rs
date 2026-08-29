@@ -20,6 +20,11 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
         "temporal",
         include_str!("../migrations/0003_temporal.sql"),
     ),
+    (
+        4,
+        "standing",
+        include_str!("../migrations/0004_standing.sql"),
+    ),
 ];
 
 /// Highest migration this build knows about. Exposed so tests track the list

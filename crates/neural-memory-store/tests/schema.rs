@@ -349,3 +349,153 @@ fn provenance_edges_are_typed_and_non_reflexive() {
 fn the_database_reports_integrity() {
     assert!(seeded().integrity_ok().unwrap());
 }
+
+// ---------------------------------------------------------------------------
+// Standing records, asserted at the SQL layer
+//
+// Same reason as the referent constraint above: the Rust layer checks this too,
+// and a rule enforced in only one layer is bypassable by writing through the
+// other. Standing is the strongest thing in the schema -- it puts text in front
+// of every future session before any work begins -- so it gets the layer that
+// cannot be routed around, tested on its own.
+// ---------------------------------------------------------------------------
+
+fn memory(s: &Store, digest: &str, class: &str, claim: &str) {
+    s.conn
+        .execute(
+            "INSERT INTO memories (record_digest, claim, evidence_class)
+             VALUES (?1, ?2, ?3)",
+            params![digest, claim, class],
+        )
+        .unwrap();
+}
+
+#[test]
+fn the_database_refuses_to_mark_an_agent_record_standing() {
+    // The prompt-injection control. write.rs clamps the agent channel to
+    // 'agentInference' before the digest exists, so an agent cannot mint an
+    // eligible record -- but that is a Rust guarantee. This asserts the door is
+    // also shut to a raw UPDATE, i.e. to an operator command line that has been
+    // handed the wrong digest.
+    let s = seeded();
+    memory(&s, D1, "agentInference", "sessions may share one checkout");
+
+    let bad = s.conn.execute(
+        "UPDATE memories SET standing_from = '2026-08-29T00:00:00Z', standing_seq = 1
+          WHERE record_digest = ?1",
+        params![D1],
+    );
+    assert!(bad.is_err(), "an agentInference record must not become standing");
+    assert!(
+        format!("{}", bad.unwrap_err()).contains("standing requires humanDecision"),
+        "the refusal must name why, not merely fail"
+    );
+
+    // And it must not have written anything on the way out.
+    let still_null: bool = s
+        .conn
+        .query_row(
+            "SELECT standing_from IS NULL FROM memories WHERE record_digest = ?1",
+            params![D1],
+            |r| r.get(0),
+        )
+        .unwrap();
+    assert!(still_null, "a refusal that already wrote is not a refusal");
+}
+
+#[test]
+fn the_database_accepts_a_human_decision_as_standing() {
+    // Polarity. Without this, a trigger that refused every UPDATE would satisfy
+    // every negative control here.
+    let s = seeded();
+    memory(&s, D2, "humanDecision", "agent sessions get their own worktree");
+    let n = s
+        .conn
+        .execute(
+            "UPDATE memories SET standing_from = '2026-08-29T00:00:00Z', standing_seq = 1
+              WHERE record_digest = ?1",
+            params![D2],
+        )
+        .unwrap();
+    assert_eq!(n, 1);
+
+    let in_force: i64 = s
+        .conn
+        .query_row("SELECT count(*) FROM standing_current", [], |r| r.get(0))
+        .unwrap();
+    assert_eq!(in_force, 1, "the view must show a live standing record");
+}
+
+#[test]
+fn a_retired_standing_record_leaves_the_view() {
+    // Retirement dominating, tested at the layer that defines it. Both halves of
+    // "retired", because the view is the single place the predicate lives and a
+    // half-written one here would be invisible everywhere else.
+    for (col, val) in [("superseded_at", "'2026-08-30T00:00:00Z'"), ("retracted_at", "'2026-08-30T00:00:00Z'")] {
+        let s = seeded();
+        memory(&s, D2, "humanDecision", "a rule that is about to be withdrawn");
+        s.conn
+            .execute(
+                "UPDATE memories SET standing_from = '2026-08-29T00:00:00Z', standing_seq = 1
+                  WHERE record_digest = ?1",
+                params![D2],
+            )
+            .unwrap();
+        let before: i64 = s
+            .conn
+            .query_row("SELECT count(*) FROM standing_current", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(before, 1);
+
+        // retraction_reason is NOT NULL-paired by a 0001 CHECK, so set both.
+        let sql = if col == "retracted_at" {
+            format!("UPDATE memories SET retracted_at = {val}, retraction_reason = 'withdrawn' WHERE record_digest = '{D2}'")
+        } else {
+            format!("UPDATE memories SET superseded_at = {val}, superseded_by = '{D1}' WHERE record_digest = '{D2}'")
+        };
+        if col == "superseded_at" {
+            memory(&s, D1, "humanDecision", "its replacement");
+        }
+        s.conn.execute(&sql, []).unwrap();
+
+        let after: i64 = s
+            .conn
+            .query_row("SELECT count(*) FROM standing_current", [], |r| r.get(0))
+            .unwrap();
+        assert_eq!(after, 0, "a {col} record must leave standing_current");
+    }
+}
+
+#[test]
+fn standing_from_and_standing_seq_must_be_set_together() {
+    // Half an interval is not an interval: standing_from alone cannot be
+    // compared against a sequence, which is the whole reason 0003 added the
+    // second axis in the first place.
+    let s = seeded();
+    memory(&s, D2, "humanDecision", "a rule");
+    let bad = s.conn.execute(
+        "UPDATE memories SET standing_from = '2026-08-29T00:00:00Z' WHERE record_digest = ?1",
+        params![D2],
+    );
+    assert!(bad.is_err(), "standing_from without standing_seq must be refused");
+}
+
+#[test]
+fn a_rule_cannot_bind_before_it_was_written() {
+    let s = seeded();
+    memory(&s, D2, "humanDecision", "a rule");
+    let seq: i64 = s
+        .conn
+        .query_row(
+            "SELECT recorded_seq FROM memories WHERE record_digest = ?1",
+            params![D2],
+            |r| r.get(0),
+        )
+        .unwrap();
+    let bad = s.conn.execute(
+        "UPDATE memories SET standing_from = '2026-08-29T00:00:00Z', standing_seq = ?2
+          WHERE record_digest = ?1",
+        params![D2, seq - 1],
+    );
+    assert!(bad.is_err(), "standing_seq before recorded_seq must be refused");
+}
