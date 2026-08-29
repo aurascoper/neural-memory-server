@@ -431,6 +431,35 @@ impl Store {
         Ok(())
     }
 
+    /// Retract a record: withdraw it with a stated reason and no replacement.
+    ///
+    /// Distinct from `supersede`, which says "this was replaced by that".
+    /// Retraction says "this should not have been believed" and names why.
+    /// The schema has carried `retracted_at`/`retracted_seq`/`retraction_reason`
+    /// since 0001 and four read sites honour them, but nothing ever wrote them —
+    /// so "retirement" meant supersession alone, and the retracted half of every
+    /// retirement check was dead code that could not be tested.
+    ///
+    /// Nothing is deleted or edited: the row stays, default retrieval hides it,
+    /// `include_retired` still returns it. The reason is required by the schema
+    /// CHECK — a retraction with no stated reason is not a retraction.
+    pub fn retract(&self, digest: &str, reason: &str, at: &str) -> Result<(), WriteError> {
+        let tx_conn = &self.conn;
+        // Same watermark reasoning as `supersede`: the withdrawal happens NOW in
+        // transaction order, and the store could not have known it earlier.
+        let now_seq: i64 = tx_conn.query_row(
+            "SELECT coalesce(max(recorded_seq), 0) FROM memories",
+            [],
+            |r| r.get(0),
+        )?;
+        tx_conn.execute(
+            "UPDATE memories SET retracted_at = ?2, retracted_seq = ?3, retraction_reason = ?4
+             WHERE record_digest = ?1",
+            params![digest, at, now_seq, reason],
+        )?;
+        Ok(())
+    }
+
     pub fn add_edge(
         &self,
         src: &str,

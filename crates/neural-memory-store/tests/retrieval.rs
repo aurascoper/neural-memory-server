@@ -345,6 +345,53 @@ fn a_retired_record_is_not_reachable_by_provenance_either() {
     assert!(r.withheld_retired.contains(&old));
 }
 
+#[test]
+fn a_retracted_record_is_not_reachable_by_provenance_either() {
+    // The sibling of the test above, for the other half of "retired".
+    //
+    // This is the one that failed. `load_candidate` selected `superseded_at`
+    // and not `retracted_at`, and provenance expansion tested only the column
+    // it had -- so a retracted record reached by a graph hop came back as a
+    // live hit and was not even reported in `withheld_retired`. Branches 1-3
+    // escaped because they filter both columns in their own SQL; branch 4 had
+    // no pre-filter and nothing caught it, because nothing wrote the column.
+    let s = store();
+    let live = claim(&s, "divergence exceeded tolerance", None);
+    let bad = claim(&s, "a supporting note that should not have been believed", None);
+    s.add_edge(&live, &bad, "derivedFrom", NOW).unwrap();
+    s.retract(&bad, "measured against the wrong reference execution", NOW)
+        .unwrap();
+
+    let r = s.recall(&opts("divergence")).unwrap();
+    assert!(
+        !r.hits.iter().any(|h| h.record_digest == bad),
+        "a retracted record reached by provenance expansion was returned as live"
+    );
+    assert!(
+        r.withheld_retired.contains(&bad),
+        "withholding must be reported, or 'there is nothing' is \
+         indistinguishable from 'there is something and it is retracted'"
+    );
+}
+
+#[test]
+fn a_retracted_record_is_still_retrievable_when_asked_for() {
+    // The positive control. Without it, a retrieval path that dropped every
+    // retracted record on the floor -- rather than withholding it -- would pass
+    // the test above.
+    let s = store();
+    let bad = claim(&s, "divergence measured against the wrong reference", None);
+    s.retract(&bad, "wrong reference execution", NOW).unwrap();
+
+    let mut o = opts("divergence");
+    o.include_retired = true;
+    let r = s.recall(&o).unwrap();
+    assert!(
+        r.hits.iter().any(|h| h.record_digest == bad),
+        "include_retired must still return a retracted record"
+    );
+}
+
 // ---------------------------------------------------------------------------
 // Determinism
 // ---------------------------------------------------------------------------

@@ -292,12 +292,14 @@ impl Store {
         let embedded: i64 = self.conn.query_row(
             "SELECT count(*) FROM embeddings e
              JOIN memories m ON m.record_digest = e.record_digest
-             WHERE e.profile_identity = ?1 AND m.superseded_at IS NULL",
+             WHERE e.profile_identity = ?1
+               AND m.superseded_at IS NULL AND m.retracted_at IS NULL",
             params![profile],
             |r| r.get(0),
         )?;
         let total: i64 = self.conn.query_row(
-            "SELECT count(*) FROM memories WHERE superseded_at IS NULL",
+            "SELECT count(*) FROM memories
+              WHERE superseded_at IS NULL AND retracted_at IS NULL",
             [],
             |r| r.get(0),
         )?;

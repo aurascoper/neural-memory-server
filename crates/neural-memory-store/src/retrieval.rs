@@ -234,7 +234,26 @@ struct Candidate {
     age_days: Option<f64>,
     superseded_at: Option<String>,
     superseded_by: Option<String>,
+    retracted_at: Option<String>,
     branches: Vec<Branch>,
+}
+
+impl Candidate {
+    /// Retired means superseded OR retracted, and it is defined here once.
+    ///
+    /// Branches 2, 3 and 4 each used to spell this out as
+    /// `c.superseded_at.is_some()`, which is half the predicate. Branches 2 and
+    /// 3 survived that only because `vector.rs` and `entity.rs` pre-filter both
+    /// columns in SQL; branch 4, provenance expansion, has no pre-filter, so a
+    /// retracted record reached by a graph hop was returned as a live hit and
+    /// was not even counted in `withheld_retired`. Latent only because nothing
+    /// writes `retracted_at` yet.
+    ///
+    /// One predicate, three callers. A fourth copy would be a fourth place to
+    /// forget the second column.
+    fn is_retired(&self) -> bool {
+        self.superseded_at.is_some() || self.retracted_at.is_some()
+    }
 }
 
 impl Store {
@@ -294,6 +313,7 @@ impl Store {
                         age_days: age,
                         superseded_at: sup_at,
                         superseded_by: sup_by,
+                        retracted_at: retracted,
                         branches: vec![Branch::Lexical],
                     },
                 );
@@ -325,7 +345,7 @@ impl Store {
                 let Some(c) = self.load_candidate(&h.record_digest, opt.as_of)? else {
                     continue;
                 };
-                if c.superseded_at.is_some() && !opt.include_retired {
+                if c.is_retired() && !opt.include_retired {
                     withheld.push(h.record_digest);
                     continue;
                 }
@@ -359,7 +379,7 @@ impl Store {
                 let Some(c) = self.load_candidate(&h.record_digest, opt.as_of)? else {
                     continue;
                 };
-                if c.superseded_at.is_some() && !opt.include_retired {
+                if c.is_retired() && !opt.include_retired {
                     withheld.push(h.record_digest);
                     continue;
                 }
@@ -395,8 +415,7 @@ impl Store {
                     let Some(c) = self.load_candidate(&digest, opt.as_of)? else {
                         continue;
                     };
-                    let retired = c.superseded_at.is_some();
-                    if retired && !opt.include_retired {
+                    if c.is_retired() && !opt.include_retired {
                         withheld.push(digest);
                         continue;
                     }
@@ -571,7 +590,7 @@ impl Store {
         let mut stmt = self.conn.prepare(
             "SELECT claim, evidence_class,
                     julianday(?2) - julianday(occurred_at),
-                    superseded_at, superseded_by
+                    superseded_at, superseded_by, retracted_at
              FROM memories WHERE record_digest = ?1",
         )?;
         let mut rows = stmt.query(params![digest, as_of])?;
@@ -587,6 +606,7 @@ impl Store {
                 age_days: r.get(2)?,
                 superseded_at: r.get(3)?,
                 superseded_by: r.get(4)?,
+                retracted_at: r.get(5)?,
                 branches: Vec::new(),
             }),
         })
@@ -857,8 +877,10 @@ impl Store {
                AND (e.src_digest = ?1 OR e.dst_digest = ?1)
                -- A retired counterpart is not an obligation: the store already
                -- says which is current, so there is nothing to adjudicate.
-               AND other.superseded_at IS NULL
-               AND me.superseded_at IS NULL",
+               -- BOTH columns, or the comment claims more than the code does:
+               -- a retracted record would still have demanded acknowledgement.
+               AND other.superseded_at IS NULL AND other.retracted_at IS NULL
+               AND me.superseded_at IS NULL AND me.retracted_at IS NULL",
         )?;
         for c in cited {
             let rows = stmt.query_map(params![c], |r| {
