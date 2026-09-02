@@ -16,3 +16,10 @@
 
 # Subagent transcripts and scratch (tool cache, not source)
 /.pi-subagents/
+
+# Agent session state and caches. 3.4 GB, and untracked-but-unignored is the
+# dangerous combination: a single `git add -A` tries to publish all of it.
+/.claude/
+
+# Local experiment scratch. 65 MB of runs and intermediates, not source.
+/experiments/
