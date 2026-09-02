@@ -23,3 +23,7 @@
 
 # Local experiment scratch. 65 MB of runs and intermediates, not source.
 /experiments/
+
+# Append-only run log written by scripts/offline-dream-report.sh. Tracking it made the tree dirty
+# after every run; the build/test evidence it carries is not worth that churn.
+/notes/offline-dream-report.jsonl
