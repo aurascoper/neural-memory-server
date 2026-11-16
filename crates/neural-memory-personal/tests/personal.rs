@@ -319,6 +319,66 @@ fn replica_only_record_has_membership_but_no_capture_or_outbox() {
 }
 
 #[test]
+fn forget_refuses_a_replica_only_record_and_enqueues_nothing() {
+    let mut store = PersonalStore::open_in_memory().unwrap();
+    let mut remote_sighting = sighting("mac", "remote-only", "2026-08-06T12:00:00.000Z");
+    remote_sighting.source = None;
+    let digest = store
+        .merge_replica(&capture("mac canonical", "{}", remote_sighting, &[]))
+        .unwrap();
+
+    let error = store
+        .forget(&digest, "2026-08-06T13:00:00.000Z")
+        .expect_err("a replica-only record must not be forgettable on the replica");
+    assert!(matches!(error, PersonalError::Conflict(_)), "{error}");
+
+    let tombstoned: bool = store
+        .conn
+        .query_row(
+            "SELECT tombstoned FROM canonical_records WHERE digest = ?1",
+            [&digest],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert!(!tombstoned, "the refusal must leave the record live");
+    for table in ["promotion_outbox", "promotion_changes"] {
+        let count: i64 = store
+            .conn
+            .query_row(&format!("SELECT count(*) FROM {table}"), [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(count, 0, "a refused forget must not enqueue into {table}");
+    }
+}
+
+#[test]
+fn forget_still_tombstones_a_locally_captured_record_that_was_also_replicated() {
+    let mut store = PersonalStore::open_in_memory().unwrap();
+    let local = sighting("gpd", "local-1", "2026-08-06T12:00:00.000Z");
+    let digest = store.capture(&capture("mine", "{}", local, &[])).unwrap();
+    let mut echoed = sighting("mac", "echo-1", "2026-08-06T12:30:00.000Z");
+    echoed.source = None;
+    assert_eq!(
+        digest,
+        store
+            .merge_replica(&capture("mine", "{}", echoed, &[]))
+            .unwrap()
+    );
+
+    assert!(store.forget(&digest, "2026-08-06T13:00:00.000Z").unwrap());
+    let queued: i64 = store
+        .conn
+        .query_row(
+            "SELECT count(*) FROM promotion_changes WHERE operation = 'tombstone' AND record_digest = ?1",
+            [&digest],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(queued, 1);
+}
+
+#[test]
 fn cursor_authority_is_epoch_then_sequence_only() {
     let store = PersonalStore::open_in_memory().unwrap();
     assert!(store

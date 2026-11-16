@@ -200,7 +200,7 @@ the former looks successful and is not.
 
 ## Testing
 
-128 tests. `cargo test`, `cargo fmt --check`, `cargo clippy --all-targets -D
+The suite is run with `cargo test`, `cargo fmt --check`, `cargo clippy --all-targets -D
 warnings`, `./scripts/check-purity.sh`.
 
 Two conventions carried from `neuralcompose-client-native`:
