@@ -379,6 +379,138 @@ fn forget_still_tombstones_a_locally_captured_record_that_was_also_replicated() 
 }
 
 #[test]
+fn local_capture_tombstone_remains_monotonic_and_single_promotion_across_echo_replay_and_reset() {
+    let mut store = PersonalStore::open_in_memory().unwrap();
+    let is_tombstoned = |store: &PersonalStore, digest: &str| -> bool {
+        store
+            .conn
+            .query_row(
+                "SELECT tombstoned != 0 FROM canonical_records WHERE digest = ?1",
+                [digest],
+                |row| row.get(0),
+            )
+            .unwrap()
+    };
+    let count_promotion_op = |store: &PersonalStore, digest: &str, op: &str| -> i64 {
+        store
+            .conn
+            .query_row(
+                "SELECT count(*) FROM promotion_changes WHERE record_digest = ?1 AND operation = ?2",
+                rusqlite::params![digest, op],
+                |row| row.get(0),
+            )
+            .unwrap()
+    };
+    let count_outbox = |store: &PersonalStore, digest: &str| -> i64 {
+        store
+            .conn
+            .query_row(
+                "SELECT count(*) FROM promotion_outbox WHERE record_digest = ?1",
+                [digest],
+                |row| row.get(0),
+            )
+            .unwrap()
+    };
+
+    // 1. Local capture.
+    let local = sighting("gpd", "local-lifecycle-1", "2026-08-06T12:00:00.000Z");
+    let digest = store.capture(&capture("mine", "{}", local, &[])).unwrap();
+    assert!(!is_tombstoned(&store, &digest));
+    assert_eq!(count_promotion_op(&store, &digest, "upsert"), 1);
+    assert_eq!(count_promotion_op(&store, &digest, "tombstone"), 0);
+
+    // 2. Replica echo from canonical Mac store.
+    let mut echoed = sighting("mac", "echo-lifecycle-1", "2026-08-06T12:30:00.000Z");
+    echoed.source = None;
+    assert_eq!(
+        digest,
+        store
+            .merge_replica(&capture("mine", "{}", echoed, &[]))
+            .unwrap()
+    );
+
+    // 3. First forget must succeed and emit exactly one tombstone promotion.
+    assert!(store.forget(&digest, "2026-08-06T13:00:00.000Z").unwrap());
+    assert!(is_tombstoned(&store, &digest));
+    assert_eq!(count_promotion_op(&store, &digest, "tombstone"), 1);
+    assert_eq!(count_outbox(&store, &digest), 2);
+
+    // 4. Repeated forget while tombstoned with replica sighting present is a no-op, not Conflict.
+    assert!(!store.forget(&digest, "2026-08-06T13:05:00.000Z").unwrap());
+    assert!(is_tombstoned(&store, &digest));
+    assert_eq!(count_promotion_op(&store, &digest, "tombstone"), 1);
+    assert_eq!(count_outbox(&store, &digest), 2);
+
+    // 5. Subsequent replica replay must not resurrect the tombstone or re-enqueue embeddings.
+    let mut replay = sighting("mac", "replay-lifecycle-1", "2026-08-06T13:10:00.000Z");
+    replay.source = None;
+    assert_eq!(
+        digest,
+        store
+            .merge_replica(&capture("mine", "{}", replay, &[]))
+            .unwrap()
+    );
+    assert!(is_tombstoned(&store, &digest));
+    let queued_embeddings: i64 = store
+        .conn
+        .query_row(
+            "SELECT count(*) FROM personal_embedding_queue WHERE record_digest = ?1",
+            [&digest],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(queued_embeddings, 0);
+    assert!(!store.forget(&digest, "2026-08-06T13:15:00.000Z").unwrap());
+    assert_eq!(count_promotion_op(&store, &digest, "tombstone"), 1);
+    assert_eq!(count_outbox(&store, &digest), 2);
+
+    // 6. Replica reset/re-enrollment preserves local capture and tombstone, clearing replica_records.
+    assert!(store
+        .advance_cursor(&Cursor {
+            epoch: 2,
+            sequence: 1,
+            replicated_as_of: None,
+        })
+        .unwrap());
+    assert_eq!(store.reset_replica_for_reenrollment(2).unwrap(), 0);
+    let replica_rows: i64 = store
+        .conn
+        .query_row(
+            "SELECT count(*) FROM replica_records WHERE record_digest = ?1",
+            [&digest],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(replica_rows, 0);
+    assert!(is_tombstoned(&store, &digest));
+    assert!(!store.forget(&digest, "2026-08-06T13:20:00.000Z").unwrap());
+
+    // 7. Post-reset replica replay still leaves tombstone monotonic and promotion singular.
+    let mut post_reset_replay = sighting("mac", "replay-after-reset-1", "2026-08-06T13:25:00.000Z");
+    post_reset_replay.source = None;
+    assert_eq!(
+        digest,
+        store
+            .merge_replica(&capture("mine", "{}", post_reset_replay, &[]))
+            .unwrap()
+    );
+    assert!(is_tombstoned(&store, &digest));
+    let queued_embeddings_after_reset: i64 = store
+        .conn
+        .query_row(
+            "SELECT count(*) FROM personal_embedding_queue WHERE record_digest = ?1",
+            [&digest],
+            |row| row.get(0),
+        )
+        .unwrap();
+    assert_eq!(queued_embeddings_after_reset, 0);
+    assert!(!store.forget(&digest, "2026-08-06T13:30:00.000Z").unwrap());
+    assert_eq!(count_promotion_op(&store, &digest, "upsert"), 1);
+    assert_eq!(count_promotion_op(&store, &digest, "tombstone"), 1);
+    assert_eq!(count_outbox(&store, &digest), 2);
+}
+
+#[test]
 fn cursor_authority_is_epoch_then_sequence_only() {
     let store = PersonalStore::open_in_memory().unwrap();
     assert!(store
