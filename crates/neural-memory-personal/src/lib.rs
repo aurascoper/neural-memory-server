@@ -819,6 +819,23 @@ impl PersonalStore {
         let tx = self
             .conn
             .transaction_with_behavior(TransactionBehavior::Immediate)?;
+        // A replica-only record (same definition as reset_replica_for_reenrollment:
+        // in replica_records with no local capture) belongs to the Mac canonical
+        // store. Tombstoning it here would enqueue the tombstone for promotion and
+        // delete it on the Mac, which the read-only replica contract forbids.
+        let replica_only: bool = tx.query_row(
+            "SELECT EXISTS (SELECT 1 FROM replica_records r
+             WHERE r.record_digest = ?1
+               AND NOT EXISTS (SELECT 1 FROM captures c WHERE c.record_digest = r.record_digest))",
+            [digest],
+            |row| row.get(0),
+        )?;
+        if replica_only {
+            return Err(PersonalError::Conflict(
+                "record is a read-only replica of the canonical store; forget it on its canonical device"
+                    .into(),
+            ));
+        }
         let changed = tx.execute(
             "UPDATE canonical_records SET tombstoned = 1
              WHERE digest = ?1 AND tombstoned = 0",
